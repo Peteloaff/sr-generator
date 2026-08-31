@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Env
+.env
+.env.local
+
+# Node / Next.js
+node_modules/
+apps/web/.next/
+apps/web/out/
+apps/web/next-env.d.ts
+
+# Local data (keep the folders, ignore contents)
+storage/references/*
+storage/training/*
+storage/generated/*
+storage/stems/*
+!storage/**/.gitkeep
+models/band/*
+models/singers/*
+!models/**/.gitkeep
+*.db
+*.sqlite3
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

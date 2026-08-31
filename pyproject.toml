@@ -1,0 +1,52 @@
+[project]
+name = "sr-generator"
+version = "0.0.0"
+description = "SR Generator - private AI band music workstation (Stage 0: foundation)"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "sqlalchemy>=2.0.36",
+    "alembic>=1.14",
+    "pydantic>=2.10",
+    "pydantic-settings>=2.6",
+    "python-multipart>=0.0.12",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+rq = [
+    "rq>=2.0",
+    "redis>=5.2",
+]
+dev = [
+    "pytest>=8.3",
+    "httpx>=0.28",
+    "fakeredis>=2.26",
+    "ruff>=0.8",
+]
+
+[project.scripts]
+sr-worker = "sr.worker.worker:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["sr*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["alembic/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+# B008: FastAPI's Depends()/Query() in defaults is the intended idiom.
+# B024: provider ABCs are extended by concrete adapters in later stages.
+ignore = ["B008", "B024"]

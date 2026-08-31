@@ -1,0 +1,50 @@
+# Optional / parity with the blueprint target stack. Stage 0 runs natively on
+# Windows without this (SQLite + inline queue). Use this when you want Postgres +
+# Redis + a separate worker, or when developing on Linux/macOS.
+#
+#   docker compose up --build
+#
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: sr
+      POSTGRES_PASSWORD: sr
+      POSTGRES_DB: sr_generator
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+
+  redis:
+    image: redis:7
+    ports: ["6379:6379"]
+
+  api:
+    build: .
+    command: >
+      sh -c "python -m alembic upgrade head &&
+             uvicorn sr.api.main:app --host 0.0.0.0 --port 8000"
+    environment:
+      SR_DATABASE_URL: postgresql+psycopg://sr:sr@db:5432/sr_generator
+      SR_QUEUE_BACKEND: rq
+      SR_REDIS_URL: redis://redis:6379/0
+    ports: ["8000:8000"]
+    depends_on: [db, redis]
+
+  worker:
+    build: .
+    command: python -m sr.worker.worker
+    environment:
+      SR_DATABASE_URL: postgresql+psycopg://sr:sr@db:5432/sr_generator
+      SR_QUEUE_BACKEND: rq
+      SR_REDIS_URL: redis://redis:6379/0
+    depends_on: [db, redis]
+
+  web:
+    build: ./apps/web
+    environment:
+      NEXT_PUBLIC_API_BASE: http://localhost:8000
+    ports: ["3000:3000"]
+    depends_on: [api]
+
+volumes:
+  pgdata:
