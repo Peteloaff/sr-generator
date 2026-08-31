@@ -14,6 +14,7 @@ import {
 } from "@/lib/api";
 import Waveform, { sectionColor } from "@/components/Waveform";
 import VocalDirector from "@/components/VocalDirector";
+import SectionRender from "@/components/SectionRender";
 
 export default function SongWorkspace({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -185,6 +186,7 @@ export default function SongWorkspace({ params }: { params: Promise<{ id: string
                 <tr>
                   <td colSpan={6}>
                     <VocalDirector scope="section" id={s.id} singers={singers} />
+                    <SectionRender songId={id} sectionId={s.id} singers={singers} />
                   </td>
                 </tr>
               )}

@@ -1,0 +1,200 @@
+"""Stage 2 - source takes, section render, stem download."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi.responses import FileResponse
+from sqlalchemy import select
+from sqlalchemy.orm import Session, selectinload
+
+from sr.common import audio
+from sr.common.storage import get_storage
+from sr.db import get_db
+from sr.models.audio_asset import AudioAsset
+from sr.models.generation_job import GenerationJob
+from sr.models.render_take import RenderTake
+from sr.models.singer import Singer
+from sr.models.song import Song, SongSection
+from sr.schemas.audio import AudioAssetRead
+from sr.schemas.job import JobRead
+from sr.schemas.render import RenderRequest, RenderTakeRead
+from sr.worker.queue import get_queue
+
+router = APIRouter(prefix="/songs", tags=["render"])
+
+
+def _section(db: Session, song_id: str, section_id: str) -> SongSection:
+    section = db.get(SongSection, section_id)
+    if section is None or section.song_id != song_id:
+        raise HTTPException(404, "section not found")
+    return section
+
+
+def _song(db: Session, song_id: str) -> Song:
+    song = db.get(Song, song_id)
+    if song is None:
+        raise HTTPException(404, "song not found")
+    return song
+
+
+@router.post(
+    "/{song_id}/sections/{section_id}/takes", response_model=AudioAssetRead, status_code=201
+)
+async def upload_source_take(
+    song_id: str,
+    section_id: str,
+    singer_id: str = Form(...),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+) -> AudioAsset:
+    section = _section(db, song_id, section_id)
+    singer = db.get(Singer, singer_id)
+    if singer is None or singer.band_id != section.song.band_id:
+        raise HTTPException(422, "singer not found in this band")
+
+    existing = db.scalar(
+        select(AudioAsset).where(
+            AudioAsset.section_id == section_id,
+            AudioAsset.singer_id == singer_id,
+            AudioAsset.asset_type == "source_take",
+        )
+    )
+    data = await file.read()
+    base = f"references/{section.song.band_id}/{song_id}/{section_id}/takes/{singer_id}"
+    try:
+        ing = audio.ingest_upload(get_storage(), base, file.filename or "take", data)
+    except ValueError as exc:
+        raise HTTPException(415 if "unsupported" in str(exc) else 422, str(exc)) from exc
+
+    if existing is not None:
+        db.delete(existing)
+        db.flush()
+    asset = AudioAsset(
+        song_id=song_id, section_id=section_id, singer_id=singer_id,
+        asset_type="source_take", file_path=ing.original_key,
+        label=f"{singer.name} — source take",
+        sample_rate=ing.info.sample_rate, channels=ing.info.channels, duration=ing.info.duration,
+    )
+    db.add(asset)
+    db.commit()
+    db.refresh(asset)
+    return asset
+
+
+@router.get("/{song_id}/sections/{section_id}/takes", response_model=list[AudioAssetRead])
+def list_source_takes(
+    song_id: str, section_id: str, db: Session = Depends(get_db)
+) -> list[AudioAsset]:
+    _section(db, song_id, section_id)
+    return list(
+        db.scalars(
+            select(AudioAsset).where(
+                AudioAsset.section_id == section_id, AudioAsset.asset_type == "source_take"
+            )
+        )
+    )
+
+
+@router.post(
+    "/{song_id}/sections/{section_id}/instrumental", response_model=AudioAssetRead, status_code=201
+)
+async def upload_instrumental(
+    song_id: str, section_id: str, file: UploadFile = File(...), db: Session = Depends(get_db)
+) -> AudioAsset:
+    section = _section(db, song_id, section_id)
+    for old in db.scalars(
+        select(AudioAsset).where(
+            AudioAsset.section_id == section_id, AudioAsset.asset_type == "instrumental_bed"
+        )
+    ):
+        db.delete(old)
+    db.flush()
+    data = await file.read()
+    base = f"references/{section.song.band_id}/{song_id}/{section_id}/instrumental"
+    try:
+        ing = audio.ingest_upload(get_storage(), base, file.filename or "instr", data)
+    except ValueError as exc:
+        raise HTTPException(415 if "unsupported" in str(exc) else 422, str(exc)) from exc
+    asset = AudioAsset(
+        song_id=song_id, section_id=section_id, asset_type="instrumental_bed",
+        file_path=ing.original_key, label="instrumental bed",
+        sample_rate=ing.info.sample_rate, channels=ing.info.channels, duration=ing.info.duration,
+    )
+    db.add(asset)
+    db.commit()
+    db.refresh(asset)
+    return asset
+
+
+@router.post("/{song_id}/sections/{section_id}/render", response_model=JobRead, status_code=201)
+def render_section_endpoint(
+    song_id: str, section_id: str, body: RenderRequest, db: Session = Depends(get_db)
+) -> GenerationJob:
+    section = _section(db, song_id, section_id)
+    if not any(r.assignments for r in section.vocal_roles):
+        raise HTTPException(422, "section has no vocal roles with singer assignments")
+    seed = body.seed if body.seed is not None else (section.generation_seed or section.song.seed)
+    job = GenerationJob(
+        job_type="render_section", song_id=song_id, section_id=section_id,
+        seed=seed, provider="layering-engine", status="queued",
+        parameters_json={k: v for k, v in {"duration": body.duration}.items() if v is not None},
+    )
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+    get_queue().enqueue(job.id)
+    db.refresh(job)
+    return job
+
+
+@router.get("/{song_id}/sections/{section_id}/renders", response_model=list[JobRead])
+def list_section_renders(
+    song_id: str, section_id: str, db: Session = Depends(get_db)
+) -> list[GenerationJob]:
+    _section(db, song_id, section_id)
+    return list(
+        db.scalars(
+            select(GenerationJob)
+            .options(selectinload(GenerationJob.outputs))
+            .where(
+                GenerationJob.section_id == section_id,
+                GenerationJob.job_type == "render_section",
+            )
+            .order_by(GenerationJob.created_at.desc())
+        )
+    )
+
+
+@router.get("/{song_id}/renders/{job_id}/takes", response_model=list[RenderTakeRead])
+def list_render_takes(song_id: str, job_id: str, db: Session = Depends(get_db)) -> list[RenderTake]:
+    job = db.get(GenerationJob, job_id)
+    if job is None or job.song_id != song_id:
+        raise HTTPException(404, "render job not found")
+    return list(
+        db.scalars(
+            select(RenderTake)
+            .where(RenderTake.generation_job_id == job_id)
+            .order_by(RenderTake.vocal_role_id, RenderTake.singer_id, RenderTake.take_index)
+        )
+    )
+
+
+@router.get("/{song_id}/assets/{asset_id}/download")
+def download_asset(
+    song_id: str, asset_id: str, inline: bool = Query(default=False), db: Session = Depends(get_db)
+) -> FileResponse:
+    _song(db, song_id)
+    asset = db.get(AudioAsset, asset_id)
+    if asset is None or asset.song_id != song_id:
+        raise HTTPException(404, "asset not found")
+    path = get_storage().path_for(asset.file_path)
+    if not path.exists():
+        raise HTTPException(410, "asset file is gone")
+    disposition = "inline" if inline else "attachment"
+    name = f"{(asset.label or asset.asset_type).replace(' ', '_')}{Path(asset.file_path).suffix}"
+    return FileResponse(
+        path, media_type="audio/wav", filename=name,
+        content_disposition_type=disposition,
+    )

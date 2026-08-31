@@ -111,38 +111,25 @@ async def upload_song_audio(
     song_id: str, file: UploadFile = File(...), db: Session = Depends(get_db)
 ) -> AudioAsset:
     song = _get_song(db, song_id)
-    suffix = Path(file.filename or "upload").suffix.lower()
-    if suffix not in audio.SUPPORTED_SUFFIXES:
-        raise HTTPException(
-            415, f"unsupported audio type {suffix!r}; supported: {sorted(audio.SUPPORTED_SUFFIXES)}"
-        )
-
-    storage = get_storage()
     data = await file.read()
-    base = f"references/{song.band_id}/{song_id}"
-    original_key = f"{base}/original{suffix}"
-    storage.write_bytes(original_key, data)
-
-    src = storage.path_for(original_key)
-    canonical = storage.path_for(f"{base}/canonical.wav")
     try:
-        info = audio.to_canonical_wav(src, canonical)
-        peaks = audio.waveform_peaks(canonical)
-    except Exception as exc:  # noqa: BLE001 - bad audio should 4xx, not 500
-        raise HTTPException(422, f"could not decode audio: {exc}") from exc
-    storage.write_text(f"{base}/peaks.json", json.dumps(peaks))
+        ing = audio.ingest_upload(
+            get_storage(), f"references/{song.band_id}/{song_id}", file.filename or "upload", data
+        )
+    except ValueError as exc:
+        raise HTTPException(415 if "unsupported" in str(exc) else 422, str(exc)) from exc
 
     asset = AudioAsset(
         song_id=song_id,
         asset_type="upload",
-        file_path=original_key,
-        sample_rate=info.sample_rate,
-        channels=info.channels,
-        duration=info.duration,
+        file_path=ing.original_key,
+        sample_rate=ing.info.sample_rate,
+        channels=ing.info.channels,
+        duration=ing.info.duration,
     )
     db.add(asset)
     if song.duration is None:
-        song.duration = info.duration
+        song.duration = ing.info.duration
     db.commit()
     db.refresh(asset)
     return asset

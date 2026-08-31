@@ -139,3 +139,51 @@ original file is kept alongside.
 **Consequences.** `pip install` is the only setup step for audio. A
 system-installed ffmpeg can be preferred later via config if needed (e.g. for
 hardware codecs). ffprobe is not bundled, so probing parses `ffmpeg -i` output.
+
+---
+
+## ADR-0010 — Stage 2 DSP is pure NumPy with deliberate approximations
+
+**Context.** The layering engine needs gain, pan, timing offset, pitch shift, and
+formant shift. Real pitch/formant shifting needs a phase vocoder or rubberband
+(not in the bundled ffmpeg, adds heavy deps).
+
+**Decision.** Implement DSP in pure NumPy for full determinism. Pitch shift is
+resample-based (so it also shifts formants and is slightly lo-fi); formant shift
+is a first-difference spectral tilt. Gain, pan (equal-power), timing offset, and
+mixing are exact.
+
+**Consequences.** The whole layering pipeline — allocation, humanization, stems,
+mix, master, reproducibility — is proven now. A `PitchProvider` / real
+time-stretch drops in later behind the same `TakeSpec` interface without touching
+the engine. Documented as a limitation in ARCHITECTURE.md.
+
+---
+
+## ADR-0011 — Seeds masked to 63 bits
+
+**Context.** `derive_seed` returned a full 64-bit value; stored as
+`RenderTake.child_seed` it overflowed SQLite's signed-64-bit INTEGER, and NumPy's
+`default_rng` wants a non-negative seed.
+
+**Decision.** Mask `derive_seed` output to 63 bits (`(1<<63)-1`). Determinism
+properties are unchanged (same input → same seed, different input → different).
+
+**Consequences.** Seeds fit signed BIGINT (SQLite + Postgres), `np.int64`, and
+`np.random.Generator` everywhere, with no per-call masking.
+
+---
+
+## ADR-0012 — Three-transaction job lifecycle
+
+**Context.** A render creates many rows in one transaction. If a flush fails
+partway, the session is poisoned — the old single-transaction runner could not
+then record the failure (it tried to write to the rolled-back session).
+
+**Decision.** `run_job` uses three transactions: (1) mark running + `attempts++`
+and commit; (2) run the handler and persist results; (3) on any exception, a
+fresh transaction marks the job failed with the error and traceback.
+
+**Consequences.** A failed render leaves no partial assets (transaction 2 rolls
+back) but still records its attempt count, status, and error. The job is visibly
+`running` while it works.

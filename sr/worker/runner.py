@@ -3,12 +3,18 @@
 Shared by every queue backend: eager, inline-thread, and RQ all ultimately call
 ``run_job(job_id)``. Captures status, timing, attempts, logs, error, and output
 assets with lineage - the blueprint's "every job records everything" rule.
+
+The lifecycle is three transactions so a failed render still records its
+attempt count and error even though its own transaction is rolled back:
+  1. mark running (attempts++)   2. run handler + persist results   3. on error, mark failed
 """
 
 from __future__ import annotations
 
 import traceback
 from datetime import UTC, datetime
+
+from sqlalchemy import func, select
 
 from sr.db import session_scope
 from sr.logging_conf import get_logger
@@ -18,28 +24,50 @@ from sr.worker.handlers import get_handler
 
 log = get_logger("worker.runner")
 
+_TERMINAL = ("succeeded", "running")
 
-def run_job(job_id: str) -> str:
-    """Run the job, persist results, return the final status."""
+
+def _begin(job_id: str) -> str | None:
+    """Mark the job running. Returns None if it should not run."""
     with session_scope() as db:
         job = db.get(GenerationJob, job_id)
         if job is None:
             raise LookupError(f"job {job_id} not found")
-        if job.status in ("succeeded", "running"):
+        if job.status in _TERMINAL:
             log.warning("job %s already %s; skipping", job_id, job.status)
             return job.status
-
         job.status = "running"
         job.attempts += 1
         job.started_at = datetime.now(UTC)
         job.error = None
         job.progress = 0.0
         job.append_log(f"start attempt {job.attempts} job_type={job.job_type}")
-        db.flush()
+    return None
 
-        try:
+
+def _mark_failed(job_id: str, error: str, tb: str) -> None:
+    with session_scope() as db:
+        job = db.get(GenerationJob, job_id)
+        if job is None:
+            return
+        job.status = "failed"
+        job.error = error
+        job.append_log("ERROR\n" + tb)
+        job.completed_at = datetime.now(UTC)
+
+
+def run_job(job_id: str) -> str:
+    skip = _begin(job_id)
+    if skip is not None:
+        return skip
+
+    try:
+        with session_scope() as db:
+            job = db.get(GenerationJob, job_id)
             handler = get_handler(job.job_type)
-            result = handler(job)
+            result = handler(job, db)
+            # Handlers that build their own asset graph (render_section) return an
+            # empty outputs list; simple providers return file specs.
             for spec in result.outputs:
                 db.add(
                     AudioAsset(
@@ -60,15 +88,18 @@ def run_job(job_id: str) -> str:
             job.provider_version = result.provider_version
             for line in result.logs:
                 job.append_log(line)
-            job.append_log(f"produced {len(result.outputs)} asset(s)")
+            db.flush()
+            produced = len(result.outputs) or db.scalar(
+                select(func.count())
+                .select_from(AudioAsset)
+                .where(AudioAsset.generation_job_id == job.id)
+            )
+            job.append_log(f"produced {produced} asset(s)")
             job.status = "succeeded"
             job.progress = 1.0
-        except Exception as exc:  # noqa: BLE001 - jobs must fail safely, not crash the worker
-            job.status = "failed"
-            job.error = f"{type(exc).__name__}: {exc}"
-            job.append_log("ERROR\n" + traceback.format_exc())
-            log.exception("job %s failed", job_id)
-        finally:
             job.completed_at = datetime.now(UTC)
-
-        return job.status
+        return "succeeded"
+    except Exception as exc:  # noqa: BLE001 - jobs must fail safely, not crash the worker
+        log.exception("job %s failed", job_id)
+        _mark_failed(job_id, f"{type(exc).__name__}: {exc}", traceback.format_exc())
+        return "failed"

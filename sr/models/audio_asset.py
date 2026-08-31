@@ -22,6 +22,9 @@ class AudioAsset(UUIDPrimaryKey, Timestamps, Base):
     section_id: Mapped[str | None] = mapped_column(
         ForeignKey("song_sections.id", ondelete="SET NULL"), default=None, index=True
     )
+    singer_id: Mapped[str | None] = mapped_column(
+        ForeignKey("singers.id", ondelete="SET NULL"), default=None, index=True
+    )
     generation_job_id: Mapped[str | None] = mapped_column(
         ForeignKey("generation_jobs.id", ondelete="SET NULL"), default=None, index=True
     )
@@ -30,6 +33,7 @@ class AudioAsset(UUIDPrimaryKey, Timestamps, Base):
     )
 
     asset_type: Mapped[str] = mapped_column(String(40), index=True)
+    label: Mapped[str | None] = mapped_column(String(200), default=None)
     file_path: Mapped[str] = mapped_column(String(500))
     sample_rate: Mapped[int | None] = mapped_column(Integer, default=None)
     channels: Mapped[int | None] = mapped_column(Integer, default=None)

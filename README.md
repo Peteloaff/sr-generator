@@ -6,9 +6,9 @@ deterministic, section- and line-level control over *which authorized singer
 performs each vocal part*, with weighted ensembles, harmonies, doubles, gang
 vocals, and screams.
 
-> **Status: Stage 1 (Singer Library + Song Workspace) complete.** No AI models
-> yet — only mock providers. Load real music and singers once the framework is
-> proven. See [ROADMAP.md](ROADMAP.md) for the staged plan.
+> **Status: Stage 2 (Audio Layering Engine) complete.** No AI models yet — source
+> vocals are uploaded takes or deterministic placeholders. Load real music and
+> singers once the framework is proven. See [ROADMAP.md](ROADMAP.md).
 
 ## What you can do today
 
@@ -22,6 +22,10 @@ vocals, and screams.
   harmony / background / gang / scream roles, assign singers with **weights**,
   and see the live normalized split and ensemble take counts
   (`Brian 70 → 7 takes`).
+- **Render a section**: upload each singer's take (or use a placeholder), hit
+  Render, and get humanized per-take stems, grouped stems, a vocal bus, a section
+  mix, and a master — with players and WAV downloads, plus a take-by-take
+  breakdown of every timing/pitch/pan variation. Same seed → identical bytes.
 - **Export / import a project** as portable JSON — carry an arrangement to
   another band; singers are matched by name.
 
@@ -63,14 +67,14 @@ npm run dev              # UI on http://localhost:3000
 
 ```
 sr/
-  api/          FastAPI app + routers (bands, singers, projects, songs, vocal, jobs)
+  api/          FastAPI app + routers (bands, singers, projects, songs, vocal, render, jobs)
   models/       SQLAlchemy ORM (the core data model)
   schemas/      Pydantic request/response models
-  services/     vocal normalization, project export/import
+  services/     vocal normalization, layering plan, section render, project i/o
   providers/    provider ABCs + mock implementations + registry
   worker/       job queue backends, runner, handlers, RQ entrypoint
   orchestrator/ generation pipeline definition (stubs for now)
-  common/       allocation, seed derivation, storage, role resolver, audio (ffmpeg)
+  common/       allocation, seeds, storage, resolver, audio (ffmpeg), dsp, synth
 alembic/        migrations
 apps/web/       Next.js UI (band switcher, song workspace, Vocal Director)
 scripts/        setup / dev / worker / test / stage_gate

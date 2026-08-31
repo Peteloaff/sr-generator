@@ -1,5 +1,43 @@
 # Changelog
 
+## [Stage 2] — Audio Layering Engine — 2026-08-31
+
+The Vocal Director's definitions now render into real, humanized, mixed audio.
+Still no AI models: source vocals are uploaded takes or deterministic
+placeholders.
+
+### Added
+- **Micro-variation engine** (`sr/services/layering.py`): `plan_role_takes(role,
+  seed)` → one `TakeSpec` per virtual performance, with largest-remainder
+  allocation and bounded timing/pitch/formant/gain/pan variation from per-take
+  child seeds, plus deterministic stereo spread from `role.width`.
+- **`RenderTake` model**: every take's child seed and applied variation values,
+  with source + output asset links — a render can be reconstructed take-for-take.
+- **DSP** (`sr/common/dsp.py`, pure NumPy): gain, equal-power pan,
+  sample-accurate timing offset, resample-based pitch shift, spectral-tilt
+  formant, sum/normalize. **Synth** (`sr/common/synth.py`): distinct deterministic
+  placeholder vocal per singer.
+- **`render_section` job** (`sr/services/render.py`): take stems → role stems →
+  grouped stems (`stem_lead_vocal` / `stem_background_vocal` / `stem_gang_vocal`)
+  → `vocal_bus` → `mix` (+ optional instrumental) → `master`. Every artifact is an
+  `AudioAsset` with parent/job lineage; the whole render is one transaction.
+- **API**: `POST /songs/{id}/sections/{sid}/takes` (source take per singer),
+  `.../instrumental`, `.../render`, `GET .../renders`, `GET .../renders/{job}/takes`,
+  `GET /songs/{id}/assets/{aid}/download` (WAV export).
+- `AudioAsset` gains `singer_id` and `label`.
+- **Web**: per-section render panel — upload takes, "Render section", inline stem
+  players + downloads, and the take-by-take variation breakdown.
+- 16 new tests (64 total); `stage_gate.py 2`.
+
+### Changed
+- Job handlers now take `(job, db)`; `run_job` uses three transactions so a failed
+  render still records its attempt + error.
+- `derive_seed` masked to 63 bits (fits signed BIGINT / numpy int64 everywhere).
+- A stale `X-Band-Id` header falls back to the default band (an explicit
+  `?band_id=` still 404s).
+
+---
+
 ## [Stage 1] — Singer Library + Song Workspace — 2026-08-31
 
 Still no AI models — mock providers only. The app is now useful for directing

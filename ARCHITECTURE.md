@@ -120,6 +120,36 @@ on read: the 100%-scaled split (`normalize_weights`) and — for ensemble roles
 `largest_remainder_allocation`. Lead/double are always one take. The UI shows
 `Brian 70 → 7 takes` without ever mutating the stored weights.
 
+## Audio layering engine (Stage 2)
+
+Turns Vocal Director definitions into rendered audio, deterministically.
+
+```
+render_section job (one transaction)
+  for each VocalRole:
+    plan_role_takes(role, seed)                     # sr/services/layering.py
+      largest-remainder allocation -> N TakeSpecs
+      each TakeSpec: child_seed = derive_seed(seed, role, singer, k)
+                     timing/pitch/formant/gain/pan = fixed offset + bounded jitter
+                     pan also fans out across +/- role.width
+    for each TakeSpec:
+      source = uploaded source_take  OR  deterministic mock synth   # sr/common/synth.py
+      DSP: pan -> time_offset -> pitch_shift -> formant_tilt -> gain # sr/common/dsp.py
+      -> take_stem AudioAsset  + RenderTake row (stores every applied value)
+    sum takes -> role_stem
+  group role stems -> stem_lead_vocal / stem_background_vocal / stem_gang_vocal
+  sum -> vocal_bus  (+ optional instrumental_bed) -> mix -> master
+```
+
+Every artifact is an `AudioAsset` with `parent_asset_id` + `generation_job_id`.
+`RenderTake` rows make a render reproducible take-for-take. Same section config +
+seed + sources + engine version → identical WAV bytes (verified by hashing the
+master across re-renders).
+
+DSP is pure NumPy for determinism. Pitch shift is resample-based (moves formants
+too) and formant is a light spectral tilt — both are placeholders for a real
+pitch/formant provider in a later stage (ADR-0010).
+
 ## Project export / import (`sr/services/project_io.py`)
 
 `export_project` → self-contained JSON: project + songs + sections + lyric lines

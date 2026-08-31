@@ -3,7 +3,15 @@
 `scripts/test.ps1` runs ruff + pytest. `scripts/stage_gate.py <N>` checks a
 stage's exit criteria and prints PASS/FAIL.
 
-## Stage 1 — automated (48 tests total, all passing)
+## Stage 2 — automated (64 tests total, all passing)
+
+| Area | File | Covers |
+|---|---|---|
+| DSP | `tests/test_dsp.py` | gain is multiplicative; pan is equal-power; timing offset preserves length; pitch shift preserves length + deterministic; sum/fit-length; peak-normalize only when hot |
+| Layering | `tests/test_layering.py` | **70/20/10 @ 10 → 7/2/1 take specs**; lead = 1 take regardless of ensemble size; plan deterministic per seed; humanization within bounds; per-assignment fixed offsets added; no assignments → no takes |
+| Render | `tests/test_render.py` | render job → `take_stem`/`role_stem`/grouped stems/`vocal_bus`/`mix`/`master`; 11 takes for lead + 7/2/1 gang; **re-render from same seed → identical master bytes**; different seed differs; uploaded source take → `source_kind="upload"`; render without roles → 422; WAV download is valid RIFF |
+
+## Stage 1 — automated (48 tests, all passing)
 
 | Area | File | Covers |
 |---|---|---|
@@ -30,9 +38,9 @@ stage's exit criteria and prints PASS/FAIL.
 |---|---|---|---|
 | 1 | Percentage normalization totals 100 / predictable rounding | 0 | ✅ `normalize_weights` |
 | 2 | Ensemble allocator 70/20/10 @ 10 → 7/2/1; largest-remainder otherwise | 0 | ✅ `largest_remainder_allocation` |
-| 3 | Seed determinism → same orchestration + humanization | 0 (seeds) / 2 (full) | ✅ seeds; ⬜ full pipeline |
-| 4 | Section isolation — regen Chorus 1 leaves Verse 1 assets | 9 | ⬜ |
-| 5 | Stem preservation — every render outputs stems + master | 2 | ⬜ |
+| 3 | Seed determinism → same orchestration + humanization | 0 (seeds) / 2 (full) | ✅ `test_render_is_repeatable_from_a_seed` (master byte-identical) |
+| 4 | Section isolation — regen Chorus 1 leaves Verse 1 assets | 9 | 🟡 renders are per-section jobs; explicit isolation test at Stage 9 |
+| 5 | Stem preservation — every render outputs stems + master | 2 | ✅ `test_render_produces_isolated_and_combined_stems` |
 | 6 | Voice isolation — singers independently selectable; disabling one doesn't corrupt others | 3 | 🟡 independent `Singer` rows, band-scoped, cross-band refs rejected (`test_bands`, `test_vocal_director`) |
 | 7 | Consent enforcement — render fails safely when a flag is missing | 3 | ⬜ (flags + defaults in place; imported singers default to false) |
 | 8 | Job recovery — failed GPU task retried without DB corruption | 0 | ✅ `test_failed_job_is_safe_and_retryable` |

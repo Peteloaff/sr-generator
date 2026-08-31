@@ -179,7 +179,80 @@ def stage1(client) -> list[Row]:
     return rows
 
 
-STAGES = {"0": stage0, "1": stage1}
+def stage2(client) -> list[Row]:
+    import hashlib
+
+    rows: list[Row] = []
+    singers = {
+        n: client.post("/singers", json={"name": n}).json()["id"]
+        for n in ("Brian", "Pete", "Brad")
+    }
+    song = client.post("/songs", json={"title": "Gate Render", "seed": 99}).json()["id"]
+    section = client.post(
+        f"/songs/{song}/sections",
+        json={"section_type": "chorus", "start_time": 0, "end_time": 3},
+    ).json()["id"]
+    client.post(
+        f"/sections/{section}/roles",
+        json={"role_type": "lead", "assignments": [{"singer_id": singers["Brian"]}]},
+    )
+    client.post(
+        f"/sections/{section}/roles",
+        json={
+            "role_type": "gang", "ensemble_size": 10, "width": 85,
+            "humanize_timing_ms": 18, "humanize_pitch_cents": 6,
+            "assignments": [
+                {"singer_id": singers["Brian"], "weight_percent": 70},
+                {"singer_id": singers["Pete"], "weight_percent": 20},
+                {"singer_id": singers["Brad"], "weight_percent": 10},
+            ],
+        },
+    )
+
+    def render_hash(seed):
+        job = client.post(
+            f"/songs/{song}/sections/{section}/render", json={"seed": seed}
+        ).json()
+        job = client.post(f"/jobs/{job['id']}/wait", params={"timeout": 60}).json()
+        assert job["status"] == "succeeded", job.get("error")
+        assets = client.get(f"/songs/{song}/assets").json()
+        master = next(
+            a for a in assets
+            if a["asset_type"] == "master" and a["generation_job_id"] == job["id"]
+        )
+        blob = client.get(f"/songs/{song}/assets/{master['id']}/download").content
+        return job, assets, hashlib.sha256(blob).hexdigest()
+
+    try:
+        job, assets, h1 = render_hash(99)
+        kinds = {a["asset_type"] for a in assets}
+        need = {"take_stem", "role_stem", "stem_lead_vocal", "stem_gang_vocal",
+                "vocal_bus", "mix", "master"}
+        got = f"{len(need & kinds)}/{len(need)} kinds"
+        rows.append(("Render -> isolated + combined stems", need <= kinds, got))
+
+        takes = client.get(f"/songs/{song}/renders/{job['id']}/takes").json()
+        counts = {}
+        for t in takes:
+            counts[t["singer_id"]] = counts.get(t["singer_id"], 0) + 1
+        gang_ok = (
+            counts.get(singers["Brian"]) == 8  # 7 gang + 1 lead
+            and counts.get(singers["Pete"]) == 2
+            and counts.get(singers["Brad"]) == 1
+        )
+        rows.append(("Gang 70/20/10 @ 10 -> 7/2/1 takes rendered", gang_ok, f"{len(takes)} takes"))
+
+        _, _, h1b = render_hash(99)
+        _, _, h3 = render_hash(1234)
+        rows.append(("Re-render from same seed -> identical bytes", h1 == h1b, "master sha256"))
+        rows.append(("Different seed -> different render", h1 != h3, "master sha256"))
+    except Exception as exc:  # noqa: BLE001
+        rows.append(("Section render", False, repr(exc)))
+
+    return rows
+
+
+STAGES = {"0": stage0, "1": stage1, "2": stage2}
 
 
 def main() -> int:

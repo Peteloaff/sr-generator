@@ -7,6 +7,7 @@ original file is always kept too.
 
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 from dataclasses import dataclass
@@ -14,6 +15,8 @@ from pathlib import Path
 
 import imageio_ffmpeg
 import numpy as np
+
+from sr.common.storage import LocalStorage
 
 FFMPEG = imageio_ffmpeg.get_ffmpeg_exe()
 CANONICAL_RATE = 44100
@@ -72,6 +75,41 @@ def to_canonical_wav(src: Path, dst: Path) -> AudioInfo:
     _run(["-y", "-v", "quiet", "-i", str(src), "-ar", str(CANONICAL_RATE),
           "-acodec", "pcm_s16le", str(dst)])
     return probe(dst)
+
+
+@dataclass(frozen=True)
+class IngestResult:
+    original_key: str
+    canonical_key: str
+    peaks_key: str
+    info: AudioInfo
+
+
+def ingest_upload(
+    storage: LocalStorage, base_key: str, filename: str, data: bytes
+) -> IngestResult:
+    """Store an uploaded audio file: original + canonical WAV + waveform peaks.
+
+    ``base_key`` is a storage-relative directory. Raises ValueError on an
+    unsupported suffix or an undecodable file.
+    """
+    suffix = Path(filename or "upload").suffix.lower()
+    if suffix not in SUPPORTED_SUFFIXES:
+        raise ValueError(
+            f"unsupported audio type {suffix!r}; supported: {sorted(SUPPORTED_SUFFIXES)}"
+        )
+
+    original_key = f"{base_key}/original{suffix}"
+    canonical_key = f"{base_key}/canonical.wav"
+    peaks_key = f"{base_key}/peaks.json"
+    storage.write_bytes(original_key, data)
+    try:
+        info = to_canonical_wav(storage.path_for(original_key), storage.path_for(canonical_key))
+        peaks = waveform_peaks(storage.path_for(canonical_key))
+    except Exception as exc:  # noqa: BLE001
+        raise ValueError(f"could not decode audio: {exc}") from exc
+    storage.write_text(peaks_key, json.dumps(peaks))
+    return IngestResult(original_key, canonical_key, peaks_key, info)
 
 
 def waveform_peaks(path: Path, buckets: int = 1200) -> list[list[float]]:

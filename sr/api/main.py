@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from sr import __version__
-from sr.api.routers import bands, health, jobs, projects, singers, songs, vocal
+from sr.api.routers import bands, health, jobs, projects, render, singers, songs, vocal
 from sr.bootstrap import ensure_default_band
 from sr.config import get_settings
 from sr.db import session_scope
@@ -42,7 +42,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    for module in (health, bands, singers, projects, songs, vocal, jobs):
+    for module in (health, bands, singers, projects, songs, vocal, render, jobs):
         app.include_router(module.router)
 
     @app.get("/", tags=["meta"])

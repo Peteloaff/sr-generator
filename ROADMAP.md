@@ -50,17 +50,23 @@ import → identical. **All PASS** (`python scripts/stage_gate.py 1`).
 
 ---
 
-## [ ] Stage 2 — Vocal Director + Audio Layering Engine
+## [x] Stage 2 — Vocal Director + Audio Layering Engine
 
 Deterministic multi-singer orchestration on supplied/mock takes.
 
-- [ ] lead / double / harmony / background / gang role types wired end to end
-- [ ] ensemble-size allocator applied to real take generation
-- [ ] micro-variation engine (timing / pitch / formant / gain / pan from child seeds)
-- [ ] stem assembly + section render + WAV/stem export
+- [x] lead / double / harmony / background / gang / scream roles wired end to end
+- [x] ensemble-size allocator drives per-take generation (`plan_role_takes`)
+- [x] micro-variation engine — timing / pitch / formant / gain / pan from child
+      seeds; every applied value stored as a `RenderTake` row
+- [x] pure-numpy DSP (`sr/common/dsp.py`) + deterministic placeholder synth
+- [x] `render_section` job: take stems → role stems → grouped stems → vocal bus →
+      section mix → master, all with lineage
+- [x] source-take + instrumental upload; WAV/stem download endpoint
+- [x] web: per-section render panel with stem players, downloads, take breakdown
 
 **Exit criteria** — given 3 singers' source takes, build a chorus with 70/20/10
 gang allocation and export isolated + combined stems repeatably from a seed.
+**All PASS** (`python scripts/stage_gate.py 2`).
 
 ---
 

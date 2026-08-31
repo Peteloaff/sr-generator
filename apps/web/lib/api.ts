@@ -34,15 +34,21 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-async function upload<T>(path: string, file: File): Promise<T> {
+async function upload<T>(path: string, file: File, fields: Record<string, string> = {}): Promise<T> {
   const fd = new FormData();
   fd.append("file", file);
+  for (const [k, v] of Object.entries(fields)) fd.append(k, v);
   const headers: Record<string, string> = {};
   const band = getBandId();
   if (band) headers["X-Band-Id"] = band;
   const res = await fetch(`${API_BASE}${path}`, { method: "POST", body: fd, headers });
   if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
   return res.json() as Promise<T>;
+}
+
+export function assetUrl(songId: string, assetId: string, opts: { inline?: boolean } = {}) {
+  const q = opts.inline ? "?inline=true" : "";
+  return `${API_BASE}/songs/${songId}/assets/${assetId}/download${q}`;
 }
 
 export interface Band { id: string; name: string; slug: string; notes: string | null }
@@ -77,14 +83,21 @@ export interface NormalizedShare {
   singer_id: string; weight_percent: number; normalized_percent: number; ensemble_takes: number;
 }
 export interface AudioAsset {
-  id: string; asset_type: string; file_path: string; duration: number | null;
-  sample_rate: number | null; channels: number | null;
+  id: string; asset_type: string; label: string | null; file_path: string;
+  duration: number | null; sample_rate: number | null; channels: number | null;
+  singer_id: string | null; section_id: string | null; generation_job_id: string | null;
 }
 export interface Waveform { asset_id: string; buckets: number; duration: number | null; peaks: number[][] }
 export interface Job {
   id: string; job_type: string; status: string; provider: string;
-  provider_version: string | null; progress: number;
-  outputs: { id: string; asset_type: string; file_path: string; duration: number | null }[];
+  provider_version: string | null; progress: number; seed: number | null; error: string | null;
+  logs: string | null;
+  outputs: AudioAsset[];
+}
+export interface RenderTake {
+  id: string; vocal_role_id: string; singer_id: string; take_index: number; child_seed: number;
+  timing_offset_ms: number; pitch_cents: number; formant_shift: number; gain_db: number; pan: number;
+  source_kind: string; source_asset_id: string | null; output_asset_id: string | null;
 }
 
 export const ROLE_TYPES = ["lead", "double", "harmony", "background", "gang", "scream"] as const;
@@ -153,6 +166,27 @@ export const api = {
   updateAssignment: (id: string, patch: Partial<Assignment>) =>
     req<Assignment>(`/assignments/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
   deleteAssignment: (id: string) => req<void>(`/assignments/${id}`, { method: "DELETE" }),
+
+  listSourceTakes: (songId: string, sectionId: string) =>
+    req<AudioAsset[]>(`/songs/${songId}/sections/${sectionId}/takes`),
+  uploadSourceTake: (songId: string, sectionId: string, singerId: string, file: File) =>
+    upload<AudioAsset>(`/songs/${songId}/sections/${sectionId}/takes`, file, {
+      singer_id: singerId,
+    }),
+  uploadInstrumental: (songId: string, sectionId: string, file: File) =>
+    upload<AudioAsset>(`/songs/${songId}/sections/${sectionId}/instrumental`, file),
+  renderSection: (songId: string, sectionId: string, body: { seed?: number | null } = {}) =>
+    req<Job>(`/songs/${songId}/sections/${sectionId}/render`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  listSectionRenders: (songId: string, sectionId: string) =>
+    req<Job[]>(`/songs/${songId}/sections/${sectionId}/renders`),
+  listRenderTakes: (songId: string, jobId: string) =>
+    req<RenderTake[]>(`/songs/${songId}/renders/${jobId}/takes`),
+  getJob: (jobId: string) => req<Job>(`/jobs/${jobId}`),
+  waitJob: (jobId: string) =>
+    req<Job>(`/jobs/${jobId}/wait?timeout=90`, { method: "POST" }),
 
   listJobs: () => req<Job[]>("/jobs"),
   createMockJob: (songId: string | null) =>

@@ -75,6 +75,10 @@ class AssetType(StrEnum):
     UPLOAD = "upload"
     REFERENCE = "reference"
     GUIDE_VOCAL = "guide_vocal"
+    SOURCE_TAKE = "source_take"  # a singer's recorded take of a section
+    INSTRUMENTAL_BED = "instrumental_bed"  # section instrumental supplied for mixing
+    TAKE_STEM = "take_stem"  # one rendered virtual performance
+    ROLE_STEM = "role_stem"  # all takes of one vocal role, summed
     STEM_DRUMS = "stem_drums"
     STEM_BASS = "stem_bass"
     STEM_GUITARS = "stem_guitars"
@@ -83,8 +87,19 @@ class AssetType(StrEnum):
     STEM_BACKGROUND_VOCAL = "stem_background_vocal"
     STEM_GANG_VOCAL = "stem_gang_vocal"
     STEM_INSTRUMENTAL = "stem_instrumental"
+    VOCAL_BUS = "vocal_bus"  # every vocal role stem, summed
     SECTION_RENDER = "section_render"
     MIX = "mix"
     MASTER = "master"
     PROJECT_STATE = "project_state"
     OTHER = "other"
+
+
+ROLE_STEM_TYPE = {
+    "lead": AssetType.STEM_LEAD_VOCAL,
+    "double": AssetType.STEM_LEAD_VOCAL,
+    "scream": AssetType.STEM_LEAD_VOCAL,
+    "harmony": AssetType.STEM_BACKGROUND_VOCAL,
+    "background": AssetType.STEM_BACKGROUND_VOCAL,
+    "gang": AssetType.STEM_GANG_VOCAL,
+}

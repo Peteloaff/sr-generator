@@ -4,6 +4,7 @@ from sr.schemas.audio import AudioAssetRead, WaveformRead
 from sr.schemas.band import BandCreate, BandRead, BandUpdate
 from sr.schemas.job import JobCreate, JobRead
 from sr.schemas.project import ProjectCreate, ProjectRead, ProjectUpdate
+from sr.schemas.render import RenderRequest, RenderTakeRead
 from sr.schemas.singer import SingerCreate, SingerRead, SingerUpdate
 from sr.schemas.song import (
     LyricLineCreate,
@@ -51,6 +52,8 @@ __all__ = [
     "LyricsReplace",
     "JobCreate",
     "JobRead",
+    "RenderRequest",
+    "RenderTakeRead",
     "NormalizedShare",
     "VocalRoleCreate",
     "VocalRoleUpdate",
