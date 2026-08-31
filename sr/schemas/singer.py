@@ -23,7 +23,7 @@ class SingerBase(BaseModel):
 
 
 class SingerCreate(SingerBase):
-    pass
+    band_id: str | None = None  # defaults to the active band
 
 
 class SingerUpdate(BaseModel):
@@ -45,6 +45,7 @@ class SingerRead(SingerBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
+    band_id: str
     training_status: str
     training_samples: int
     created_at: datetime

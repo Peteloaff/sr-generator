@@ -21,7 +21,7 @@ def test_lines_attach_to_song_and_section(client):
     assert l1.json()["section_id"] == sec_id
 
     bad = client.post(f"/songs/{song_id}/lines", json={"text": "x", "section_id": "nope"})
-    assert bad.status_code == 422
+    assert bad.status_code == 404
 
     assert len(client.get(f"/songs/{song_id}/lines").json()) == 1
 

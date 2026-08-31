@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { api, type Song } from "@/lib/api";
 
 export default function SongsPage() {
@@ -28,8 +29,7 @@ export default function SongsPage() {
     <div>
       <h1>Songs</h1>
       <p className="muted">
-        Stage 0 stores song metadata only. Sections, lyric lines, and the Vocal
-        Director UI arrive in Stage 1.
+        Open a song to upload audio, mark sections, edit lyrics, and direct vocals.
       </p>
       {err && <p className="danger">{err}</p>}
       <div className="row">
@@ -46,22 +46,24 @@ export default function SongsPage() {
           <tr>
             <th>Title</th>
             <th>Status</th>
+            <th>Duration</th>
             <th>BPM</th>
             <th>Key</th>
-            <th>Seed</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
           {songs.map((s) => (
             <tr key={s.id}>
-              <td>{s.title}</td>
+              <td>
+                <Link href={`/songs/${s.id}`}>{s.title}</Link>
+              </td>
               <td>
                 <span className="pill">{s.status}</span>
               </td>
+              <td>{s.duration ? `${s.duration.toFixed(1)}s` : "—"}</td>
               <td>{s.bpm ?? "—"}</td>
               <td>{s.key ?? "—"}</td>
-              <td>{s.seed ?? "—"}</td>
               <td>
                 <button className="danger" onClick={() => api.deleteSong(s.id).then(refresh)}>
                   delete

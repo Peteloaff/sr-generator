@@ -88,3 +88,54 @@ requested duration, at deterministic paths derived from the seed.
 **Consequences.** Storage, asset rows, duration/sample-rate metadata, and
 download paths are all exercised for real. Swapping in a model provider changes
 bytes, not plumbing.
+
+---
+
+## ADR-0007 — `Band` as the top-level tenant (Stage 1)
+
+**Context.** The blueprint is "an AI version of one band". The product owner
+wants to reuse the app for a second band if it works well - and retrofitting
+tenancy onto a mature schema is painful.
+
+**Decision.** Add a `Band` entity now, while the schema is young. `Singer`,
+`Project`, `Song`, and `BandReference` all carry `band_id` (cascade delete). A
+default band is auto-created on first run. The API resolves the active band from
+`?band_id=`, an `X-Band-Id` header, or the default; the web app keeps the choice
+in `localStorage` and sends the header. Singer names are unique *per band*, not
+globally.
+
+**Consequences.** Single-band UX is unchanged (one band, everything filtered).
+A second band is one `POST /bands` away, fully isolated. Every list/create
+endpoint now goes through the band dependency. Cross-band references (e.g. a
+vocal assignment pointing at another band's singer) are rejected at the API.
+
+---
+
+## ADR-0008 — Squash migrations before the first release
+
+**Context.** Stage 1 changed `singers` (drop global-unique `name`, add composite
+unique + `band_id`). Alembic batch mode on SQLite does not reliably drop an
+unnamed unique constraint, and there is no deployed database with real data.
+
+**Decision.** Collapse the Stage 0 + Stage 1 migrations into a single
+`initial schema (through stage 1)` revision. Do this only while nothing is
+deployed; once real data exists, migrations are append-only.
+
+**Consequences.** Clean schema, no batch-mode constraint gymnastics. Migration
+history restarts from one revision.
+
+---
+
+## ADR-0009 — Bundled ffmpeg via `imageio-ffmpeg`
+
+**Context.** Audio decode/probe/waveform needs ffmpeg. The target machine has no
+ffmpeg on PATH and no Docker.
+
+**Decision.** Depend on `imageio-ffmpeg`, which ships a static ffmpeg binary per
+platform. `sr/common/audio.py` calls `imageio_ffmpeg.get_ffmpeg_exe()`. All
+uploads are transcoded to a canonical 16-bit 44.1k WAV for analysis; the
+original file is kept alongside.
+
+**Consequences.** `pip install` is the only setup step for audio. A
+system-installed ffmpeg can be preferred later via config if needed (e.g. for
+hardware codecs). ffprobe is not bundled, so probing parses `ffmpeg -i` output.

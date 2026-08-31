@@ -3,7 +3,17 @@
 `scripts/test.ps1` runs ruff + pytest. `scripts/stage_gate.py <N>` checks a
 stage's exit criteria and prints PASS/FAIL.
 
-## Stage 0 — automated (29 tests, all passing)
+## Stage 1 — automated (48 tests total, all passing)
+
+| Area | File | Covers |
+|---|---|---|
+| Band scoping | `tests/test_bands.py` | default band auto-created; singers isolated per band (same name allowed in two bands, duplicate rejected within one); list filtered by band; band delete cascades; default band protected |
+| Audio upload | `tests/test_audio_upload.py` | upload WAV → `AudioAsset(upload)` with real duration/SR; song picks up duration; waveform peaks in `[-1, 1]`; unsupported type → 415 |
+| Vocal Director | `tests/test_vocal_director.py` | section/line role + assignment CRUD; **70/20/10 @ 10 → 7/2/1** via `/normalized`; weights need not sum to 100; lead = 1 take; duplicate-singer guard; cross-band singer rejected; line role overrides section |
+| Workspace editing | `tests/test_workspace_editing.py` | section PATCH + reorder (+ wrong-id-set rejected); lyrics text block → line list; line moves between sections |
+| Project save/load | `tests/test_project_io.py` | **export → import → identical**; import into another band creates placeholder singers (consent false); bad export version → 422 |
+
+## Stage 0 — automated
 
 | Area | File | Covers |
 |---|---|---|
@@ -23,11 +33,11 @@ stage's exit criteria and prints PASS/FAIL.
 | 3 | Seed determinism → same orchestration + humanization | 0 (seeds) / 2 (full) | ✅ seeds; ⬜ full pipeline |
 | 4 | Section isolation — regen Chorus 1 leaves Verse 1 assets | 9 | ⬜ |
 | 5 | Stem preservation — every render outputs stems + master | 2 | ⬜ |
-| 6 | Voice isolation — singers independently selectable; disabling one doesn't corrupt others | 3 | ⬜ (model exists: independent `Singer` rows, cascade-scoped) |
-| 7 | Consent enforcement — render fails safely when a flag is missing | 3 | ⬜ (flags + defaults in place) |
+| 6 | Voice isolation — singers independently selectable; disabling one doesn't corrupt others | 3 | 🟡 independent `Singer` rows, band-scoped, cross-band refs rejected (`test_bands`, `test_vocal_director`) |
+| 7 | Consent enforcement — render fails safely when a flag is missing | 3 | ⬜ (flags + defaults in place; imported singers default to false) |
 | 8 | Job recovery — failed GPU task retried without DB corruption | 0 | ✅ `test_failed_job_is_safe_and_retryable` |
 | 9 | Asset lineage — every output knows its source assets + job | 0 | ✅ `generation_job_id` + `parent_asset_id` asserted |
-| 10 | UI state fidelity — save/reload preserves boundaries, weights, roles, seeds, gains, pans, provider settings | 1 | ⬜ |
+| 10 | UI state fidelity — save/reload preserves boundaries, weights, roles, seeds, gains, pans, provider settings | 1 | ✅ `test_export_import_roundtrip_is_identical` |
 
 ## Audio evaluation protocol (Stages 3–4, to be filled in)
 

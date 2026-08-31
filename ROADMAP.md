@@ -31,21 +31,22 @@ Clean repo + product skeleton, no AI generation.
 
 ---
 
-## [ ] Stage 1 — Singer Library + Existing-Song Workspace
+## [x] Stage 1 — Singer Library + Existing-Song Workspace
 
 Useful with uploaded audio, before any voice generation.
 
-- [ ] Audio upload + storage + `AudioAsset(asset_type=upload)`
-- [ ] Waveform display
-- [ ] Section create/edit UI; lyric-line editor
-- [ ] Singer profile screens + consent fields
-- [ ] VocalRole / VocalAssignment editor with percentage normalization
-- [ ] Per-line singer chip + popover (lead dropdown + weighted list)
-- [ ] Project save / load (round-trips exactly)
+- [x] `Band` entity — everything scoped by `band_id`; a second band is one row
+- [x] Audio upload + storage + `AudioAsset(asset_type=upload)` (bundled ffmpeg)
+- [x] Waveform peaks endpoint + SVG display with section overlays
+- [x] Section create / edit / reorder API + UI; lyric-line editor (text → lines)
+- [x] Singer profile screens + consent fields (band-scoped)
+- [x] VocalRole / VocalAssignment CRUD + live percentage normalization + take counts
+- [x] Per-line vocal-role override (line overrides section) in the workspace
+- [x] Project export / import — portable JSON snapshot, round-trips exactly
 
 **Exit criteria** — upload a song, mark Verse/Chorus/Breakdown, assign singers
-and vocal roles to every section (and override on specific lines), save and
-reload byte-for-byte.
+and vocal roles to every section (and override on specific lines), export →
+import → identical. **All PASS** (`python scripts/stage_gate.py 1`).
 
 ---
 

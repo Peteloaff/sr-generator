@@ -3,8 +3,8 @@ explicitly approved, as training/conditioning data (Band DNA - Stage 6)."""
 
 from __future__ import annotations
 
-from sqlalchemy import JSON, Boolean, Float, String, Text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import JSON, Boolean, Float, ForeignKey, String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from sr.models.base import Base, Timestamps, UUIDPrimaryKey
 
@@ -12,6 +12,9 @@ from sr.models.base import Base, Timestamps, UUIDPrimaryKey
 class BandReference(UUIDPrimaryKey, Timestamps, Base):
     __tablename__ = "band_references"
 
+    band_id: Mapped[str] = mapped_column(
+        ForeignKey("bands.id", ondelete="CASCADE"), index=True
+    )
     title: Mapped[str] = mapped_column(String(200))
     source_file: Mapped[str | None] = mapped_column(String(500), default=None)
     bpm: Mapped[float | None] = mapped_column(Float, default=None)
@@ -24,3 +27,5 @@ class BandReference(UUIDPrimaryKey, Timestamps, Base):
 
     # Never assume an upload is training data.
     approved_for_training: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    band: Mapped[Band] = relationship(back_populates="references")  # noqa: F821

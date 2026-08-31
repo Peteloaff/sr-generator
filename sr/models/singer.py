@@ -6,7 +6,7 @@ train or render without the required consent flags.
 
 from __future__ import annotations
 
-from sqlalchemy import Boolean, Integer, String, Text
+from sqlalchemy import Boolean, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from sr.models.base import Base, Timestamps, UUIDPrimaryKey
@@ -14,8 +14,12 @@ from sr.models.base import Base, Timestamps, UUIDPrimaryKey
 
 class Singer(UUIDPrimaryKey, Timestamps, Base):
     __tablename__ = "singers"
+    __table_args__ = (UniqueConstraint("band_id", "name", name="uq_singer_band_name"),)
 
-    name: Mapped[str] = mapped_column(String(120), unique=True)
+    band_id: Mapped[str] = mapped_column(
+        ForeignKey("bands.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(120))
     display_name: Mapped[str | None] = mapped_column(String(120), default=None)
     notes: Mapped[str | None] = mapped_column(Text, default=None)
 
@@ -36,6 +40,7 @@ class Singer(UUIDPrimaryKey, Timestamps, Base):
     consent_version: Mapped[str | None] = mapped_column(String(60), default=None)
     consent_source_ref: Mapped[str | None] = mapped_column(String(500), default=None)
 
+    band: Mapped[Band] = relationship(back_populates="singers")  # noqa: F821
     assignments: Mapped[list[VocalAssignment]] = relationship(  # noqa: F821
         back_populates="singer", cascade="all, delete-orphan"
     )

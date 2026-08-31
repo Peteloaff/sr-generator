@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import BandSwitcher from "@/components/BandSwitcher";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "SR Generator",
-  description: "Private AI band music workstation - Stage 0",
+  description: "Private AI band music workstation",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -17,8 +18,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/">Home</Link>
             <Link href="/singers">Singers</Link>
             <Link href="/songs">Songs</Link>
+            <Link href="/projects">Projects</Link>
             <Link href="/jobs">Jobs</Link>
           </nav>
+          <span style={{ marginLeft: "auto" }}>
+            <BandSwitcher />
+          </span>
         </header>
         <main>{children}</main>
       </body>

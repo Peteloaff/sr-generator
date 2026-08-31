@@ -36,6 +36,7 @@ class SongRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
+    band_id: str
     project_id: str | None
     title: str
     bpm: float | None
@@ -57,6 +58,17 @@ class SectionCreate(BaseModel):
     start_time: float | None = None
     end_time: float | None = None
     order_index: int = 0
+    lyrics: str | None = None
+    prompt_override: str | None = None
+    generation_seed: int | None = None
+
+
+class SectionUpdate(BaseModel):
+    section_type: SectionType | None = None
+    name: str | None = None
+    start_time: float | None = None
+    end_time: float | None = None
+    order_index: int | None = None
     lyrics: str | None = None
     prompt_override: str | None = None
     generation_seed: int | None = None
@@ -85,6 +97,14 @@ class LyricLineCreate(BaseModel):
     end_time: float | None = None
 
 
+class LyricLineUpdate(BaseModel):
+    text: str | None = None
+    section_id: str | None = None
+    order_index: int | None = None
+    start_time: float | None = None
+    end_time: float | None = None
+
+
 class LyricLineRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -95,3 +115,10 @@ class LyricLineRead(BaseModel):
     text: str
     start_time: float | None
     end_time: float | None
+
+
+class LyricsReplace(BaseModel):
+    """Replace all of a song's lyric lines from a block of text (one line each)."""
+
+    text: str
+    section_id: str | None = None

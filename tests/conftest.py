@@ -41,3 +41,17 @@ def _clean_tables() -> Iterator[None]:
 def client() -> Iterator[TestClient]:
     with TestClient(create_app()) as c:
         yield c
+
+
+@pytest.fixture
+def sample_wav(tmp_path: Path) -> Path:
+    """A short real WAV file for upload tests."""
+    import numpy as np
+    import soundfile as sf
+
+    rate = 44100
+    t = np.linspace(0, 1.5, int(rate * 1.5), endpoint=False)
+    sig = (0.25 * np.sin(2 * np.pi * 220 * t)).astype(np.float32)
+    path = tmp_path / "clip.wav"
+    sf.write(path, np.stack([sig, sig], axis=1), rate)
+    return path

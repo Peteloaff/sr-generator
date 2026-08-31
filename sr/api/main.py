@@ -2,13 +2,27 @@
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from sr import __version__
-from sr.api.routers import health, jobs, projects, singers, songs
+from sr.api.routers import bands, health, jobs, projects, singers, songs, vocal
+from sr.bootstrap import ensure_default_band
 from sr.config import get_settings
+from sr.db import session_scope
 from sr.logging_conf import configure_logging
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    try:
+        with session_scope() as db:
+            ensure_default_band(db)
+    except Exception:  # noqa: BLE001 - migrations may not have run yet; not fatal
+        pass
+    yield
 
 
 def create_app() -> FastAPI:
@@ -18,7 +32,8 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="SR Generator API",
         version=__version__,
-        summary="Private AI band music workstation - Stage 0 foundation",
+        summary="Private AI band music workstation",
+        lifespan=lifespan,
     )
     app.add_middleware(
         CORSMiddleware,
@@ -27,11 +42,8 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    app.include_router(health.router)
-    app.include_router(singers.router)
-    app.include_router(projects.router)
-    app.include_router(songs.router)
-    app.include_router(jobs.router)
+    for module in (health, bands, singers, projects, songs, vocal, jobs):
+        app.include_router(module.router)
 
     @app.get("/", tags=["meta"])
     def root() -> dict:

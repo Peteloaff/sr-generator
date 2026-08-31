@@ -19,6 +19,7 @@ class ProjectRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
+    band_id: str
     name: str
     description: str | None
     created_at: datetime

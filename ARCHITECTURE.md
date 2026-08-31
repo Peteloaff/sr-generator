@@ -37,15 +37,26 @@
 ## Data model
 
 ```
-Project 1─* Song 1─* SongSection 1─* LyricLine
-                         │                │
-                         └── VocalRole ───┘      (exactly one parent: section OR line)
-                                  │
-                                  *─ VocalAssignment ─* Singer
+Band 1─* Singer
+Band 1─* BandReference           (Band DNA, Stage 6)
+Band 1─* Project 1─* Song 1─* SongSection 1─* LyricLine
+Band 1───────────* Song                │                │
+                         └──────── VocalRole ───────────┘   (exactly one parent: section OR line)
+                                       │
+                                       *─ VocalAssignment ─* Singer
 Song 1─* GenerationJob 1─* AudioAsset ─┐
 AudioAsset *─1 AudioAsset (parent)  ────┘  (lineage)
-BandReference (Band DNA, Stage 6)
 ```
+
+### Band scoping (ADR-0007)
+
+`Band` is the top-level tenant. `Singer`, `Project`, `Song`, and `BandReference`
+carry `band_id` and cascade-delete with the band. A default band is auto-created
+on first run. The active band is resolved by `sr/api/deps.get_band` from
+`?band_id=`, the `X-Band-Id` header, or the default; the web app stores the
+choice in `localStorage`. Singer names are unique per band. The API rejects
+cross-band references (e.g. assigning another band's singer to a role). The
+product stays single-band in feel — a second band is one `POST /bands`.
 
 ### LyricLine and role resolution (SR Generator amendment)
 
@@ -85,6 +96,37 @@ plan → music → guide melody → vocal-direct → voice render → ensemble e
 align → vocal process → stem mix → master → export. Each stage becomes one or
 more `GenerationJob`s as later stages land. `plan_dry_run(song_id)` returns the
 ordered steps a full generation *would* run.
+
+## Audio pipeline (`sr/common/audio.py`)
+
+ffmpeg comes from `imageio-ffmpeg` (bundled binary, no system install — ADR-0009).
+On upload:
+
+1. Original bytes stored at `references/{band}/{song}/original.{ext}`.
+2. Transcoded to `canonical.wav` (16-bit / 44.1k) — the single format everything
+   downstream reads.
+3. `peaks.json` — downsampled `[min, max]` pairs for the waveform, cached beside
+   the audio and regenerated on demand.
+
+`AudioAsset(asset_type="upload")` holds the handle; canonical + peaks are
+sidecars by convention. Stage 2 (layering) and Stage 5 (separation) build on the
+canonical WAV.
+
+## Vocal weight normalization (`sr/services/vocal.py`)
+
+`weight_percent` is stored exactly as entered. `normalized_shares(role)` computes,
+on read: the 100%-scaled split (`normalize_weights`) and — for ensemble roles
+(background / gang / harmony) — the integer take allocation via
+`largest_remainder_allocation`. Lead/double are always one take. The UI shows
+`Brian 70 → 7 takes` without ever mutating the stored weights.
+
+## Project export / import (`sr/services/project_io.py`)
+
+`export_project` → self-contained JSON: project + songs + sections + lyric lines
++ vocal roles + assignments, with singers referenced **by name** (not id) so a
+project is portable across bands. `import_project` rebuilds it under a target
+band, creating placeholder singers (consent flags false) for any name not
+already present. Round-trip is byte-identical (`export == re-export`).
 
 ## Storage
 

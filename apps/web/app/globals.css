@@ -4,6 +4,7 @@
   --muted: #9aa1ac;
   --accent: #6ea8fe;
   --line: #262a33;
+  --panel: #171a21;
 }
 * { box-sizing: border-box; }
 body {
@@ -21,21 +22,55 @@ header {
 }
 header nav { display: flex; gap: 1rem; }
 a { color: var(--accent); text-decoration: none; }
-main { padding: 1.5rem; max-width: 900px; }
+main { padding: 1.5rem; max-width: 1000px; margin: 0 auto; }
 h1 { font-size: 1.4rem; }
+h2 { font-size: 1.05rem; margin-top: 1.75rem; color: var(--muted); }
 table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
-th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--line); }
+th, td { text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--line); vertical-align: top; }
 th { color: var(--muted); font-weight: 600; }
-input, button {
+input, button, select, textarea {
   font: inherit;
-  padding: 0.4rem 0.6rem;
+  padding: 0.35rem 0.55rem;
   border-radius: 6px;
   border: 1px solid var(--line);
-  background: #171a21;
+  background: var(--panel);
   color: var(--fg);
 }
 button { cursor: pointer; border-color: var(--accent); }
 button.danger { border-color: #d1667a; color: #f0a9b6; }
-.row { display: flex; gap: 0.5rem; align-items: center; margin: 1rem 0; }
+.row { display: flex; gap: 0.5rem; align-items: center; margin: 1rem 0; flex-wrap: wrap; }
+.row.space { justify-content: space-between; }
 .muted { color: var(--muted); }
-.pill { font-size: 0.8rem; padding: 0.1rem 0.5rem; border: 1px solid var(--line); border-radius: 999px; }
+.pill { font-size: 0.8rem; padding: 0.1rem 0.35rem; border: 1px solid var(--line); border-radius: 999px; }
+.band-switcher { display: inline-flex; gap: 0.4rem; align-items: center; }
+
+.waveform {
+  width: 100%;
+  height: 140px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: block;
+}
+.vocal-director {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.75rem;
+  margin: 0.5rem 0;
+}
+.role-card {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.6rem;
+}
+.role-card table { margin: 0.3rem 0; }
+.role-card td { border: none; padding: 0.2rem 0.5rem 0.2rem 0; }
+pre {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.75rem;
+  overflow-x: auto;
+}

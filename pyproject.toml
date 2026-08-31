@@ -1,7 +1,7 @@
 [project]
 name = "sr-generator"
-version = "0.0.0"
-description = "SR Generator - private AI band music workstation (Stage 0: foundation)"
+version = "0.1.0"
+description = "SR Generator - private AI band music workstation (Stage 1: singer library + song workspace)"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",
@@ -12,6 +12,9 @@ dependencies = [
     "pydantic-settings>=2.6",
     "python-multipart>=0.0.12",
     "python-dotenv>=1.0",
+    "numpy>=2.1",
+    "soundfile>=0.12",
+    "imageio-ffmpeg>=0.5",
 ]
 
 [project.optional-dependencies]

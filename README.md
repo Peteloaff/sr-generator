@@ -6,27 +6,35 @@ deterministic, section- and line-level control over *which authorized singer
 performs each vocal part*, with weighted ensembles, harmonies, doubles, gang
 vocals, and screams.
 
-> **Status: Stage 0 (Foundation) complete.** No AI models yet — only mock
-> providers. See [ROADMAP.md](ROADMAP.md) for the staged plan.
+> **Status: Stage 1 (Singer Library + Song Workspace) complete.** No AI models
+> yet — only mock providers. Load real music and singers once the framework is
+> proven. See [ROADMAP.md](ROADMAP.md) for the staged plan.
 
-## What Stage 0 gives you
+## What you can do today
 
-- FastAPI backend + SQLAlchemy/Alembic schema for all core entities
-  (Singer, Project, Song, SongSection, **LyricLine**, VocalRole, VocalAssignment,
-  BandReference, GenerationJob, AudioAsset).
-- A job system: every audio/ML operation is a queued `GenerationJob` that records
-  seed, parameters, provider version, input assets, logs, and output assets.
-- Provider abstraction (music / voice / stem / analysis / mastering /
-  transcription) with **mock implementations** that produce real silent WAVs.
-- Deterministic **largest-remainder allocation** and **child-seed derivation**
-  (the 70/20/10 → 7/2/1 rule).
-- A Next.js app with CRUD for singers, songs, and jobs.
+- **Run more than one band.** Everything is scoped to a `Band`; a second band is
+  one click, fully isolated. Default band auto-created.
+- **Upload an existing demo / instrumental** (wav/mp3/flac/m4a/ogg — ffmpeg is
+  bundled) and see its **waveform** with section overlays.
+- **Mark sections** (verse / chorus / breakdown / …) and edit lyrics as a text
+  block that becomes per-line rows.
+- **Direct the vocals**: per section *or* per lyric line, add lead / double /
+  harmony / background / gang / scream roles, assign singers with **weights**,
+  and see the live normalized split and ensemble take counts
+  (`Brian 70 → 7 takes`).
+- **Export / import a project** as portable JSON — carry an arrangement to
+  another band; singers are matched by name.
+
+Underneath (from Stage 0): provider abstraction with mock implementations, a
+queued job system with full lineage, deterministic largest-remainder allocation
+and child-seed derivation.
 
 ## Requirements
 
 - Python 3.12+
 - Node 20+ (for the web app)
-- No database or Redis install needed for Stage 0 (SQLite + in-process queue).
+- No database, Redis, or ffmpeg install needed (SQLite + in-process queue +
+  bundled ffmpeg).
 
 ## Quick start (Windows, native)
 
@@ -46,23 +54,25 @@ npm run dev              # UI on http://localhost:3000
 ## Verify the stage gate
 
 ```powershell
-.\scripts\test.ps1                          # ruff + pytest
-.\.venv\Scripts\python.exe scripts\stage_gate.py   # Stage 0 exit criteria PASS/FAIL
+.\scripts\test.ps1                                  # ruff + pytest
+.\.venv\Scripts\python.exe scripts\stage_gate.py    # latest stage's exit criteria PASS/FAIL
+.\.venv\Scripts\python.exe scripts\stage_gate.py 0  # a specific stage
 ```
 
 ## Repository layout
 
 ```
 sr/
-  api/          FastAPI app + routers
+  api/          FastAPI app + routers (bands, singers, projects, songs, vocal, jobs)
   models/       SQLAlchemy ORM (the core data model)
   schemas/      Pydantic request/response models
+  services/     vocal normalization, project export/import
   providers/    provider ABCs + mock implementations + registry
   worker/       job queue backends, runner, handlers, RQ entrypoint
   orchestrator/ generation pipeline definition (stubs for now)
-  common/       allocation, seed derivation, storage, role resolver
+  common/       allocation, seed derivation, storage, role resolver, audio (ffmpeg)
 alembic/        migrations
-apps/web/       Next.js UI
+apps/web/       Next.js UI (band switcher, song workspace, Vocal Director)
 scripts/        setup / dev / worker / test / stage_gate
 storage/        local audio assets (references, training, generated, stems)
 ```

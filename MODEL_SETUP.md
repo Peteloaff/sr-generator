@@ -1,7 +1,11 @@
 # Model / Provider Setup
 
-Stage 0 ships **mock providers only**. This file will grow as real adapters land.
-The contract every provider implements is in `sr/providers/base.py`.
+Stages 0–1 ship **mock providers only**. This file will grow as real adapters
+land. The contract every provider implements is in `sr/providers/base.py`.
+
+**ffmpeg** is already handled: `imageio-ffmpeg` (a base dependency) ships a static
+binary, used by `sr/common/audio.py` for upload transcoding and waveforms. No
+system install needed. ffprobe is not bundled — probing parses `ffmpeg -i`.
 
 ## Provider kinds
 

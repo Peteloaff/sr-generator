@@ -16,6 +16,9 @@ from sr.models.base import Base, Timestamps, UUIDPrimaryKey
 class Song(UUIDPrimaryKey, Timestamps, Base):
     __tablename__ = "songs"
 
+    band_id: Mapped[str] = mapped_column(
+        ForeignKey("bands.id", ondelete="CASCADE"), index=True
+    )
     project_id: Mapped[str | None] = mapped_column(
         ForeignKey("projects.id", ondelete="SET NULL"), default=None, index=True
     )
