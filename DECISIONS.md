@@ -187,3 +187,60 @@ fresh transaction marks the job failed with the error and traceback.
 **Consequences.** A failed render leaves no partial assets (transaction 2 rolls
 back) but still records its attempt count, status, and error. The job is visibly
 `running` while it works.
+
+---
+
+## ADR-0013 — Stage 3 voice conversion is real DSP, not a neural model
+
+**Context.** The exit criterion is "the same guide renders as each singer
+independently". There are no real singer samples yet (singers are added through
+the app later), and a neural voice model is multi-GB + per-singer training +
+GPU. The user's directive: build the framework first.
+
+**Decision.** Ship `LocalDspVoiceProvider` — a genuine transformation of the
+guide vocal (pitch to the target register, STFT formant warp, spectral tilt,
+breath, drive). It preserves intelligibility (the words are the guide's) and
+makes singers audibly distinct. It is dependency-free and deterministic. The
+`VoiceProvider` contract (`analyze` + `convert`) is what a neural model plugs
+into; `HttpVoiceProvider` already speaks to a GPU service.
+
+**Consequences.** The whole pipeline — voice model setup, guide input, per-singer
+conversion, caching, consent, assembly, determinism — is proven end to end now.
+Swapping in RVC / so-vits-svc changes `sr/providers/` only. Audio *quality* (a
+neural model's job) is explicitly out of scope for this stage; the full
+intelligibility/alignment eval protocol waits for a real provider.
+
+---
+
+## ADR-0014 — The conversion cache is filesystem-first
+
+**Context.** A cached conversion should survive a rolled-back render so a retry
+is cheap. The obvious design (write the cache row in its own transaction) works
+on Postgres but **deadlocks on SQLite** — its single writer cannot grant a
+second concurrent write transaction while the render transaction is open.
+
+**Decision.** The cache is addressed by a deterministic file path
+(`cache/voice_conversion/{key}.wav`), written to storage *before* the render
+transaction commits. `lookup()` checks the filesystem; the `RenderCache` DB row
+is best-effort bookkeeping written on the render's own session.
+
+**Consequences.** No second transaction, no deadlock, and the "retry is cheap"
+property holds (the file is on disk regardless of the DB rollback). Job progress
+uses the same rule — update on the handler's session and flush.
+
+---
+
+## ADR-0015 — Consent is enforced at the API and again in the job
+
+**Context.** Blueprint acceptance test #7: rendering must fail safely when a
+required authorization flag is missing.
+
+**Decision.** `sr/services/consent.py` is the single choke point.
+`render_section_endpoint` returns **403** listing every assigned singer without
+`consent_generation` before queuing; `render_section` raises again if reached.
+`train_singer` requires `consent_training` at both the endpoint and the handler.
+Any singer that appears in a render needs generation consent — placeholder,
+converted, or uploaded — the simplest defensible rule.
+
+**Consequences.** Test fixtures that render must grant `consent_generation`
+(Stage 2 fixtures updated). Imported placeholder singers stay blocked by default.

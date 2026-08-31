@@ -58,6 +58,14 @@ export interface Singer {
   consent_training: boolean; consent_generation: boolean; consent_commercial: boolean;
   training_status: string;
 }
+export interface VoiceProfile {
+  median_f0?: number; formant_semitones?: number; brightness?: number;
+  breathiness?: number; roughness?: number;
+}
+export interface VoiceModel {
+  singer_id: string; training_status: string; training_samples: number;
+  voice_model_provider: string | null; voice_profile: VoiceProfile | null;
+}
 export interface Song {
   id: string; band_id: string; project_id: string | null; title: string;
   status: string; bpm: number | null; key: string | null; duration: number | null; seed: number | null;
@@ -166,6 +174,23 @@ export const api = {
   updateAssignment: (id: string, patch: Partial<Assignment>) =>
     req<Assignment>(`/assignments/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
   deleteAssignment: (id: string) => req<void>(`/assignments/${id}`, { method: "DELETE" }),
+
+  getVoiceModel: (singerId: string) => req<VoiceModel>(`/singers/${singerId}/voice-model`),
+  setVoiceProfile: (singerId: string, patch: VoiceProfile) =>
+    req<VoiceModel>(`/singers/${singerId}/voice-model`, {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    }),
+  trainVoiceModel: (singerId: string) =>
+    req<Job>(`/singers/${singerId}/voice-model/train`, { method: "POST" }),
+  listVoiceSamples: (singerId: string) =>
+    req<AudioAsset[]>(`/singers/${singerId}/samples`),
+  uploadVoiceSample: (singerId: string, file: File) =>
+    upload<AudioAsset>(`/singers/${singerId}/samples`, file),
+  deleteVoiceSample: (singerId: string, assetId: string) =>
+    req<void>(`/singers/${singerId}/samples/${assetId}`, { method: "DELETE" }),
+  uploadGuide: (songId: string, sectionId: string, file: File) =>
+    upload<AudioAsset>(`/songs/${songId}/sections/${sectionId}/guide`, file),
 
   listSourceTakes: (songId: string, sectionId: string) =>
     req<AudioAsset[]>(`/songs/${songId}/sections/${sectionId}/takes`),

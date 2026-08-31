@@ -6,7 +6,7 @@ train or render without the required consent flags.
 
 from __future__ import annotations
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Boolean, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from sr.models.base import Base, Timestamps, UUIDPrimaryKey
@@ -23,9 +23,12 @@ class Singer(UUIDPrimaryKey, Timestamps, Base):
     display_name: Mapped[str | None] = mapped_column(String(120), default=None)
     notes: Mapped[str | None] = mapped_column(Text, default=None)
 
-    # Voice model wiring - stays abstract; a real VoiceProvider fills these in Stage 3.
+    # Voice model wiring. The provider owns interpretation of the profile / path;
+    # for local-dsp the profile is a small dict (pitch/formant/brightness/...),
+    # for a neural provider ``voice_model_path_or_id`` points at weights.
     voice_model_provider: Mapped[str | None] = mapped_column(String(60), default=None)
     voice_model_path_or_id: Mapped[str | None] = mapped_column(String(500), default=None)
+    voice_profile_json: Mapped[dict | None] = mapped_column(JSON, default=None)
 
     clean_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     scream_enabled: Mapped[bool] = mapped_column(Boolean, default=False)

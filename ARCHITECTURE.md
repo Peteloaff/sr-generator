@@ -120,6 +120,38 @@ on read: the 100%-scaled split (`normalize_weights`) and — for ensemble roles
 `largest_remainder_allocation`. Lead/double are always one take. The UI shows
 `Brian 70 → 7 takes` without ever mutating the stored weights.
 
+## Singing voice provider (Stage 3)
+
+A guide vocal (one melody/phrase per section) is converted into each singer's
+voice. The `VoiceProvider` contract (`sr/providers/base.py`):
+
+| method | purpose |
+|---|---|
+| `analyze(sample_paths, singer_ref)` | derive a voice profile / model descriptor from training samples |
+| `convert(guide_path, profile, params, seed)` | → `VoiceConversion` (raw mono audio) |
+
+Implementations: **`local_dsp`** (default — `sr/common/voice.py`: pitch to the
+singer's register, STFT formant warp, spectral tilt, breath, drive — the words
+survive, the voice changes), **`mock`** (fast detune), **`http`** (POSTs to
+`SR_VOICE_HTTP_URL` — a local or remote GPU model service). A neural model
+(RVC / so-vits-svc / DiffSinger) implements the same two methods — see
+`MODEL_SETUP.md`.
+
+**Render resolution** per singer (`sr/services/render.py:_base_vocal`):
+uploaded `source_take` → guide + `training_status=="ready"` voice model (converted,
+cached) → deterministic placeholder.
+
+**Consent** (`sr/services/consent.py`): a render is 403 if any assigned singer
+lacks `consent_generation`; `train_singer` fails without `consent_training`.
+Checked at the API and again inside the job.
+
+**Conversion cache** (`sr/services/cache.py`): filesystem-first. A conversion is
+a WAV at `cache/voice_conversion/{key}` keyed by `(provider version, guide hash,
+profile)`, written before the render transaction commits — so a job retry after a
+rollback finds the file and skips the work. The `RenderCache` row is best-effort
+bookkeeping. (SQLite's single writer cannot grant a second concurrent write
+transaction, so the cache cannot rely on one.)
+
 ## Audio layering engine (Stage 2)
 
 Turns Vocal Director definitions into rendered audio, deterministically.

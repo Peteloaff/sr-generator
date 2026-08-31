@@ -74,7 +74,9 @@ class JobStatus(StrEnum):
 class AssetType(StrEnum):
     UPLOAD = "upload"
     REFERENCE = "reference"
-    GUIDE_VOCAL = "guide_vocal"
+    GUIDE_VOCAL = "guide_vocal"  # one melody/phrase per section, converted per singer
+    SINGER_SAMPLE = "singer_sample"  # training-input audio for a singer's voice model
+    CONVERTED_VOCAL = "converted_vocal"  # a voice-converted guide (cached base per singer)
     SOURCE_TAKE = "source_take"  # a singer's recorded take of a section
     INSTRUMENTAL_BED = "instrumental_bed"  # section instrumental supplied for mixing
     TAKE_STEM = "take_stem"  # one rendered virtual performance

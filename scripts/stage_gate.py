@@ -49,6 +49,21 @@ def _wav_bytes(seconds: float = 1.0, rate: int = 44100) -> bytes:
     return buf.getvalue()
 
 
+def _guide_bytes(seconds: float = 3.0, rate: int = 44100) -> bytes:
+    import numpy as np
+    import soundfile as sf
+
+    t = np.linspace(0, seconds, int(rate * seconds), endpoint=False)
+    mel = np.zeros_like(t)
+    for i, f in enumerate([180.0, 220.0, 200.0, 247.0, 180.0]):
+        seg = (t >= i * 0.6) & (t < (i + 1) * 0.6)
+        mel[seg] = np.sin(2 * np.pi * f * t[seg])
+    am = 0.4 + 0.6 * np.clip(np.sin(2 * np.pi * 3 * t) ** 2, 0.0, 1.0)
+    buf = io.BytesIO()
+    sf.write(buf, (0.4 * mel * am).astype("float32"), rate, format="WAV")
+    return buf.getvalue()
+
+
 Row = tuple[str, bool, str]
 
 
@@ -183,10 +198,11 @@ def stage2(client) -> list[Row]:
     import hashlib
 
     rows: list[Row] = []
-    singers = {
-        n: client.post("/singers", json={"name": n}).json()["id"]
-        for n in ("Brian", "Pete", "Brad")
-    }
+    singers = {}
+    for n in ("Brian", "Pete", "Brad"):
+        sid = client.post("/singers", json={"name": n}).json()["id"]
+        client.patch(f"/singers/{sid}", json={"consent_generation": True})
+        singers[n] = sid
     song = client.post("/songs", json={"title": "Gate Render", "seed": 99}).json()["id"]
     section = client.post(
         f"/songs/{song}/sections",
@@ -252,7 +268,96 @@ def stage2(client) -> list[Row]:
     return rows
 
 
-STAGES = {"0": stage0, "1": stage1, "2": stage2}
+def stage3(client) -> list[Row]:
+    import hashlib
+
+    rows: list[Row] = []
+    guide = _guide_bytes()
+
+    singers = {}
+    for name, prof in (
+        ("Brian", {"median_f0": 110.0, "brightness": -0.5}),
+        ("Pete", {"median_f0": 250.0, "brightness": 0.4, "breathiness": 0.3}),
+    ):
+        sid = client.post("/singers", json={"name": name}).json()["id"]
+        client.patch(f"/singers/{sid}", json={"consent_generation": True})
+        client.patch(f"/singers/{sid}/voice-model", json=prof)
+        singers[name] = sid
+
+    song = client.post("/songs", json={"title": "Gate S3", "seed": 7}).json()["id"]
+    section = client.post(
+        f"/songs/{song}/sections",
+        json={"section_type": "verse", "start_time": 0, "end_time": 3},
+    ).json()["id"]
+    for name in ("Brian", "Pete"):
+        client.post(
+            f"/sections/{section}/roles",
+            json={"role_type": "lead", "assignments": [{"singer_id": singers[name]}]},
+        )
+    client.post(
+        f"/songs/{song}/sections/{section}/guide",
+        files={"file": ("g.wav", guide, "audio/wav")},
+    )
+
+    def render_once(seed):
+        job = client.post(
+            f"/songs/{song}/sections/{section}/render", json={"seed": seed}
+        ).json()
+        job = client.post(f"/jobs/{job['id']}/wait", params={"timeout": 90}).json()
+        assert job["status"] == "succeeded", job.get("error")
+        return job
+
+    try:
+        job = render_once(7)
+        takes = client.get(f"/songs/{song}/renders/{job['id']}/takes").json()
+        converted = all(t["source_kind"] == "converted" for t in takes) and len(takes) >= 2
+        rows.append(("Guide converted per singer via VoiceProvider", converted,
+                     f"{len(takes)} takes, all converted"))
+
+        stems = {
+            a["singer_id"]: a["id"]
+            for a in client.get(f"/songs/{song}/assets").json()
+            if a["asset_type"] == "take_stem"
+        }
+        b = client.get(f"/songs/{song}/assets/{stems[singers['Brian']]}/download").content
+        p = client.get(f"/songs/{song}/assets/{stems[singers['Pete']]}/download").content
+        indep = b != p and len(b) > 1000
+        rows.append(("Each singer is an independent rendering", indep, "stems differ"))
+
+        def master_hash(seed):
+            j = render_once(seed)
+            m = next(a for a in client.get(f"/songs/{song}/assets").json()
+                     if a["asset_type"] == "master" and a["generation_job_id"] == j["id"])
+            return hashlib.sha256(
+                client.get(f"/songs/{song}/assets/{m['id']}/download").content
+            ).hexdigest()
+
+        repeatable = master_hash(7) == master_hash(7)
+        rows.append(("Conversion render is repeatable", repeatable, "master sha256"))
+    except Exception as exc:  # noqa: BLE001
+        rows.append(("Voice conversion render", False, repr(exc)))
+
+    # consent gate
+    try:
+        blocked = client.post("/singers", json={"name": "NoConsent"}).json()["id"]
+        client.patch(f"/singers/{blocked}/voice-model", json={"median_f0": 200.0})
+        s2 = client.post("/songs", json={"title": "x"}).json()["id"]
+        sec2 = client.post(f"/songs/{s2}/sections", json={"section_type": "verse"}).json()["id"]
+        client.post(
+            f"/sections/{sec2}/roles",
+            json={"role_type": "lead", "assignments": [{"singer_id": blocked}]},
+        )
+        r = client.post(f"/songs/{s2}/sections/{sec2}/render", json={})
+        rows.append(
+            ("Render blocked without consent_generation", r.status_code == 403, str(r.status_code))
+        )
+    except Exception as exc:  # noqa: BLE001
+        rows.append(("Consent gate", False, repr(exc)))
+
+    return rows
+
+
+STAGES = {"0": stage0, "1": stage1, "2": stage2, "3": stage3}
 
 
 def main() -> int:

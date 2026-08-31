@@ -23,7 +23,7 @@ _EPS = 1e-9
 def load_stereo(path: Path, sr: int = SR) -> np.ndarray:
     data, file_sr = sf.read(str(path), dtype="float32", always_2d=True)
     if file_sr != sr:
-        data = _resample(data, int(round(data.shape[0] * sr / file_sr)))
+        data = resample(data, int(round(data.shape[0] * sr / file_sr)))
     if data.shape[1] == 1:
         data = np.repeat(data, 2, axis=1)
     elif data.shape[1] > 2:
@@ -36,7 +36,7 @@ def save_wav(path: Path, x: np.ndarray, sr: int = SR) -> None:
     sf.write(str(path), np.clip(x, -1.0, 1.0).astype(np.float32), sr, subtype="PCM_16")
 
 
-def _resample(x: np.ndarray, target_len: int) -> np.ndarray:
+def resample(x: np.ndarray, target_len: int) -> np.ndarray:
     if target_len <= 0:
         return np.zeros((0, x.shape[1]), dtype=np.float32)
     if target_len == x.shape[0]:
@@ -91,7 +91,7 @@ def pitch_shift_cents(x: np.ndarray, cents: float, sr: int = SR) -> np.ndarray:
     if abs(cents) < _EPS:
         return x
     ratio = 2.0 ** (cents / 1200.0)
-    shifted = _resample(x, int(round(x.shape[0] / ratio)))
+    shifted = resample(x, int(round(x.shape[0] / ratio)))
     return fit_length(shifted, x.shape[0])
 
 

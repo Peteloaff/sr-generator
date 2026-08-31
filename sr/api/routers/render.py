@@ -20,6 +20,7 @@ from sr.models.song import Song, SongSection
 from sr.schemas.audio import AudioAssetRead
 from sr.schemas.job import JobRead
 from sr.schemas.render import RenderRequest, RenderTakeRead
+from sr.services.consent import blocked_for_generation
 from sr.worker.queue import get_queue
 
 router = APIRouter(prefix="/songs", tags=["render"])
@@ -128,6 +129,37 @@ async def upload_instrumental(
     return asset
 
 
+@router.post(
+    "/{song_id}/sections/{section_id}/guide", response_model=AudioAssetRead, status_code=201
+)
+async def upload_guide_vocal(
+    song_id: str, section_id: str, file: UploadFile = File(...), db: Session = Depends(get_db)
+) -> AudioAsset:
+    section = _section(db, song_id, section_id)
+    for old in db.scalars(
+        select(AudioAsset).where(
+            AudioAsset.section_id == section_id, AudioAsset.asset_type == "guide_vocal"
+        )
+    ):
+        db.delete(old)
+    db.flush()
+    data = await file.read()
+    base = f"references/{section.song.band_id}/{song_id}/{section_id}/guide"
+    try:
+        ing = audio.ingest_upload(get_storage(), base, file.filename or "guide", data)
+    except ValueError as exc:
+        raise HTTPException(415 if "unsupported" in str(exc) else 422, str(exc)) from exc
+    asset = AudioAsset(
+        song_id=song_id, section_id=section_id, asset_type="guide_vocal",
+        file_path=ing.original_key, label="guide vocal",
+        sample_rate=ing.info.sample_rate, channels=ing.info.channels, duration=ing.info.duration,
+    )
+    db.add(asset)
+    db.commit()
+    db.refresh(asset)
+    return asset
+
+
 @router.post("/{song_id}/sections/{section_id}/render", response_model=JobRead, status_code=201)
 def render_section_endpoint(
     song_id: str, section_id: str, body: RenderRequest, db: Session = Depends(get_db)
@@ -135,6 +167,17 @@ def render_section_endpoint(
     section = _section(db, song_id, section_id)
     if not any(r.assignments for r in section.vocal_roles):
         raise HTTPException(422, "section has no vocal roles with singer assignments")
+
+    assigned = {a.singer_id for r in section.vocal_roles for a in r.assignments}
+    singers = list(db.scalars(select(Singer).where(Singer.id.in_(assigned))))
+    blocked = blocked_for_generation(singers)
+    if blocked:
+        raise HTTPException(
+            403,
+            f"consent_generation is not authorized for: {', '.join(blocked)}. "
+            "Grant it on the singer before rendering.",
+        )
+
     seed = body.seed if body.seed is not None else (section.generation_seed or section.song.seed)
     job = GenerationJob(
         job_type="render_section", song_id=song_id, section_id=section_id,

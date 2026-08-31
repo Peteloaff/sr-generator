@@ -1,9 +1,9 @@
 """SR Generator - private AI band music workstation.
 
-Stage 2: the audio layering engine. Vocal Director definitions render into
-humanized, weighted stem takes and a section mix/master, repeatably from a seed.
-Still no AI models - source vocals are uploaded takes or deterministic
-placeholders. See ROADMAP.md for the staged plan.
+Stage 3: a real singing-voice provider. A guide vocal is converted into each
+singer's voice (pitch / formant / timbre), consent-gated, cached, deterministic.
+The LocalDspVoiceProvider is dependency-free; a neural model plugs into the same
+contract. See ROADMAP.md and MODEL_SETUP.md.
 """
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"

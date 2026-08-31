@@ -10,7 +10,11 @@ from __future__ import annotations
 
 import abc
 from dataclasses import dataclass, field
-from typing import Any
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    import numpy as np
 
 
 @dataclass
@@ -20,6 +24,18 @@ class ProviderResult:
     outputs: list[dict[str, Any]] = field(default_factory=list)  # {asset_type, file_path, ...}
     metadata: dict[str, Any] = field(default_factory=dict)
     logs: list[str] = field(default_factory=list)
+
+
+@dataclass
+class VoiceConversion:
+    """A converted guide vocal, returned as raw mono audio so the caller owns
+    caching + file writing (local providers synthesise, remote ones fetch)."""
+
+    samples: np.ndarray  # mono float32
+    sample_rate: int
+    provider: str
+    provider_version: str
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class BaseProvider(abc.ABC):
@@ -36,10 +52,28 @@ class MusicGenerationProvider(BaseProvider):
 
 
 class VoiceProvider(BaseProvider):
+    """Renders / converts a guide vocal into a chosen singer identity while
+    preserving melody, timing, and lyrics. A neural model (RVC, so-vits-svc,
+    DiffSinger, ...) implements this same interface - locally or as an HTTP
+    service to a GPU worker."""
+
+    #: does this provider learn a model from samples, or only apply a profile?
+    trains: bool = False
+
     @abc.abstractmethod
-    def render(
-        self, *, guide_asset: str | None, singer_ref: str, params: dict[str, Any], seed: int
-    ) -> ProviderResult: ...
+    def analyze(self, sample_paths: list[Path], *, singer_ref: str) -> dict[str, Any]:
+        """Derive a voice profile / model descriptor from training samples."""
+
+    @abc.abstractmethod
+    def convert(
+        self,
+        *,
+        guide_path: Path,
+        profile: dict[str, Any],
+        params: dict[str, Any],
+        seed: int,
+    ) -> VoiceConversion:
+        """Convert one guide vocal toward the given voice profile."""
 
 
 class StemSeparationProvider(BaseProvider):

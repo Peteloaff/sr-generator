@@ -6,9 +6,10 @@ deterministic, section- and line-level control over *which authorized singer
 performs each vocal part*, with weighted ensembles, harmonies, doubles, gang
 vocals, and screams.
 
-> **Status: Stage 2 (Audio Layering Engine) complete.** No AI models yet — source
-> vocals are uploaded takes or deterministic placeholders. Load real music and
-> singers once the framework is proven. See [ROADMAP.md](ROADMAP.md).
+> **Status: Stage 3 (Singing Voice Provider) complete.** A guide vocal is
+> converted into each singer's voice — real DSP (`local_dsp`), consent-gated,
+> deterministic; a neural model plugs into the same contract
+> ([MODEL_SETUP.md](MODEL_SETUP.md)). No music model yet. See [ROADMAP.md](ROADMAP.md).
 
 ## What you can do today
 
@@ -22,10 +23,15 @@ vocals, and screams.
   harmony / background / gang / scream roles, assign singers with **weights**,
   and see the live normalized split and ensemble take counts
   (`Brian 70 → 7 takes`).
-- **Render a section**: upload each singer's take (or use a placeholder), hit
-  Render, and get humanized per-take stems, grouped stems, a vocal bus, a section
-  mix, and a master — with players and WAV downloads, plus a take-by-take
-  breakdown of every timing/pitch/pan variation. Same seed → identical bytes.
+- **Give each singer a voice**: upload training samples and run the analysis, or
+  set the profile by hand (pitch / formant / brightness / breathiness /
+  roughness). Training and generation are blocked until you grant consent.
+- **Render a section**: upload one guide vocal and each singer with a ready voice
+  model has it converted into their voice; or upload a real take per singer; or
+  fall back to a placeholder. Hit Render → humanized per-take stems, grouped
+  stems, a vocal bus, a section mix, and a master — players + WAV downloads +
+  a take-by-take breakdown (`source: converted / upload / mock`). Same seed →
+  identical bytes.
 - **Export / import a project** as portable JSON — carry an arrangement to
   another band; singers are matched by name.
 
@@ -67,14 +73,14 @@ npm run dev              # UI on http://localhost:3000
 
 ```
 sr/
-  api/          FastAPI app + routers (bands, singers, projects, songs, vocal, render, jobs)
+  api/          FastAPI app + routers (bands, singers, voice_models, songs, vocal, render, jobs)
   models/       SQLAlchemy ORM (the core data model)
   schemas/      Pydantic request/response models
-  services/     vocal normalization, layering plan, section render, project i/o
-  providers/    provider ABCs + mock implementations + registry
-  worker/       job queue backends, runner, handlers, RQ entrypoint
+  services/     vocal normalization, layering plan, render, voice consent, cache, project i/o
+  providers/    ABCs + mock + local_dsp/http voice providers + registry
+  worker/       job queue backends, runner, handlers, progress, RQ entrypoint
   orchestrator/ generation pipeline definition (stubs for now)
-  common/       allocation, seeds, storage, resolver, audio (ffmpeg), dsp, synth
+  common/       allocation, seeds, storage, resolver, audio, dsp, synth, voice
 alembic/        migrations
 apps/web/       Next.js UI (band switcher, song workspace, Vocal Director)
 scripts/        setup / dev / worker / test / stage_gate

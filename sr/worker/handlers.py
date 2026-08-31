@@ -10,13 +10,19 @@ return empty outputs.
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import Path
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from sr.common.storage import get_storage
 from sr.config import get_settings
+from sr.models.audio_asset import AudioAsset
 from sr.models.generation_job import GenerationJob
+from sr.models.singer import Singer
 from sr.providers import base
 from sr.providers.registry import get_provider
+from sr.services.consent import require_training
 from sr.services.render import render_section
 
 Handler = Callable[[GenerationJob, Session], base.ProviderResult]
@@ -47,13 +53,44 @@ def _separate_stems(job: GenerationJob, db: Session) -> base.ProviderResult:
     )
 
 
-def _render_voice(job: GenerationJob, db: Session) -> base.ProviderResult:
+def _train_singer(job: GenerationJob, db: Session) -> base.ProviderResult:
     params = job.parameters_json or {}
-    return get_provider("voice").render(
-        guide_asset=params.get("guide_asset"),
-        singer_ref=str(params.get("singer_ref", "unknown")),
-        params=params,
-        seed=_seed(job),
+    singer = db.get(Singer, str(params.get("singer_id", "")))
+    if singer is None:
+        raise LookupError("train_singer job requires a valid singer_id")
+    require_training(singer)  # ConsentError -> job fails safely
+
+    storage = get_storage()
+    samples = db.scalars(
+        select(AudioAsset).where(
+            AudioAsset.singer_id == singer.id, AudioAsset.asset_type == "singer_sample"
+        )
+    )
+    paths: list[Path] = []
+    for a in samples:
+        canonical = storage.path_for(f"{Path(a.file_path).parent}/canonical.wav")
+        if canonical.exists():
+            paths.append(canonical)
+    if not paths:
+        raise ValueError("no training samples uploaded for this singer")
+
+    provider = get_provider("voice")
+    singer.training_status = "training"
+    db.flush()
+    profile = provider.analyze(paths, singer_ref=singer.name)
+
+    singer.voice_profile_json = profile
+    singer.voice_model_provider = provider.name
+    singer.voice_model_path_or_id = getattr(provider, "version", None)
+    singer.training_samples = len(paths)
+    singer.training_status = "ready"
+
+    return base.ProviderResult(
+        provider=provider.name,
+        provider_version=getattr(provider, "version", "0"),
+        outputs=[],
+        metadata={"singer_id": singer.id, "profile": profile, "samples": len(paths)},
+        logs=[f"trained {singer.name!r} voice model from {len(paths)} sample(s): {profile}"],
     )
 
 
@@ -77,7 +114,7 @@ _HANDLERS: dict[str, Handler] = {
     "mock_generation": _mock_generation,
     "analyze_reference": _analyze_reference,
     "separate_stems": _separate_stems,
-    "render_voice": _render_voice,
+    "train_singer": _train_singer,
     "render_section": _render_section,
     "master": _master,
 }

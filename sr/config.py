@@ -26,7 +26,8 @@ class Settings(BaseSettings):
     storage_root: Path = REPO_ROOT / "storage"
 
     music_provider: str = "mock"
-    voice_provider: str = "mock"
+    voice_provider: str = "local_dsp"
+    voice_http_url: str = ""
     stem_provider: str = "mock"
     analysis_provider: str = "mock"
     mastering_provider: str = "mock"

@@ -10,10 +10,11 @@ import pytest
 
 @pytest.fixture
 def chorus(client):
-    singers = {
-        n: client.post("/singers", json={"name": n}).json()["id"]
-        for n in ("Brian", "Pete", "Brad")
-    }
+    singers = {}
+    for n in ("Brian", "Pete", "Brad"):
+        sid = client.post("/singers", json={"name": n}).json()["id"]
+        client.patch(f"/singers/{sid}", json={"consent_generation": True})
+        singers[n] = sid
     song = client.post("/songs", json={"title": "Render", "seed": 99}).json()["id"]
     section = client.post(
         f"/songs/{song}/sections",

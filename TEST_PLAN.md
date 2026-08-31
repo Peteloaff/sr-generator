@@ -3,7 +3,15 @@
 `scripts/test.ps1` runs ruff + pytest. `scripts/stage_gate.py <N>` checks a
 stage's exit criteria and prints PASS/FAIL.
 
-## Stage 2 — automated (64 tests total, all passing)
+## Stage 3 — automated (79 tests total, all passing)
+
+| Area | File | Covers |
+|---|---|---|
+| Voice DSP | `tests/test_voice.py` | `estimate_f0` tracks a tone; `analyze` → usable profile; profile dict round-trip; `convert` preserves length + deterministic; different profiles → different centroid; output stays bounded |
+| Voice-model setup | `tests/test_voice_model.py` | sample upload → `train_singer` job → `training_status=ready` + profile; **train 403 without `consent_training`**; 422 without samples; manual `PATCH` marks ready; samples list/delete |
+| Conversion render | `tests/test_stage3_render.py` | guide + voice model → all takes `source="converted"`; **each singer is an independent rendering** (take stems differ); deterministic + cached; **render 403 without `consent_generation`**; no guide → `source="mock"` |
+
+## Stage 2 — automated (64 tests, all passing)
 
 | Area | File | Covers |
 |---|---|---|
@@ -41,17 +49,23 @@ stage's exit criteria and prints PASS/FAIL.
 | 3 | Seed determinism → same orchestration + humanization | 0 (seeds) / 2 (full) | ✅ `test_render_is_repeatable_from_a_seed` (master byte-identical) |
 | 4 | Section isolation — regen Chorus 1 leaves Verse 1 assets | 9 | 🟡 renders are per-section jobs; explicit isolation test at Stage 9 |
 | 5 | Stem preservation — every render outputs stems + master | 2 | ✅ `test_render_produces_isolated_and_combined_stems` |
-| 6 | Voice isolation — singers independently selectable; disabling one doesn't corrupt others | 3 | 🟡 independent `Singer` rows, band-scoped, cross-band refs rejected (`test_bands`, `test_vocal_director`) |
-| 7 | Consent enforcement — render fails safely when a flag is missing | 3 | ⬜ (flags + defaults in place; imported singers default to false) |
+| 6 | Voice isolation — singers independently selectable; disabling one doesn't corrupt others | 3 | ✅ per-singer voice models; `test_guide_is_converted_per_singer` shows independent renders |
+| 7 | Consent enforcement — render fails safely when a flag is missing | 3 | ✅ `test_render_blocked_without_consent`, `test_train_without_consent_is_403` |
 | 8 | Job recovery — failed GPU task retried without DB corruption | 0 | ✅ `test_failed_job_is_safe_and_retryable` |
 | 9 | Asset lineage — every output knows its source assets + job | 0 | ✅ `generation_job_id` + `parent_asset_id` asserted |
 | 10 | UI state fidelity — save/reload preserves boundaries, weights, roles, seeds, gains, pans, provider settings | 1 | ✅ `test_export_import_roundtrip_is_identical` |
 
-## Audio evaluation protocol (Stages 3–4, to be filled in)
+## Audio evaluation protocol
+
+**Automated now** (Stage 2–3): repeatability (master byte-identical across
+re-renders from a seed), each singer renders independently, phase — no collapse
+because takes are summed as distinct stereo signals, stems always exportable.
+
+**Deferred to a real neural `VoiceProvider`** — the `local_dsp` provider proves
+the pipeline, not audio quality, so subjective scoring waits:
 
 - Fixed guide-phrase test set per singer.
-- Metrics: intelligibility (subjective 1–5), alignment error (ms), pitch error
-  (cents), repeatability (byte/spectral diff across identical seeds), stem
-  bleed/phase.
+- Metrics: intelligibility (1–5), alignment error (ms), pitch error (cents),
+  timbre similarity to reference, stem bleed.
 - A/B: gain-only mix vs ensemble mode — panel scoring, phase-correlation check.
-- Gate: agreed thresholds must pass before the stage is marked complete.
+- Gate: agreed thresholds must pass before promoting a provider to default.

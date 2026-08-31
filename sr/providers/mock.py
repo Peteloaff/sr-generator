@@ -6,9 +6,13 @@ job/asset/lineage pipeline can be exercised end to end without any AI model.
 
 from __future__ import annotations
 
+import hashlib
 import wave
 from io import BytesIO
+from pathlib import Path
 from typing import Any
+
+import numpy as np
 
 from sr.common.seeds import bounded_jitter, derive_seed
 from sr.common.storage import get_storage
@@ -19,6 +23,7 @@ from sr.providers.base import (
     ProviderResult,
     StemSeparationProvider,
     TranscriptionProvider,
+    VoiceConversion,
     VoiceProvider,
 )
 
@@ -66,26 +71,28 @@ class MockMusicProvider(MusicGenerationProvider):
 
 class MockVoiceProvider(VoiceProvider):
     name = "mock"
-    version = "mock-voice-0.1.0"
+    version = "mock-voice-0.2.0"
+    trains = False
 
-    def render(
-        self, *, guide_asset: str | None, singer_ref: str, params: dict[str, Any], seed: int
-    ) -> ProviderResult:
-        duration = float(params.get("duration", 4.0))
-        child = derive_seed(seed, "voice", singer_ref, params.get("take_index", 0))
-        key = f"generated/mock/voice_{singer_ref}_{child}.wav"
-        out = _write_asset(key, duration)
-        out["asset_type"] = "stem_lead_vocal"
-        return self._result(
-            outputs=[out],
-            metadata={
-                "singer_ref": singer_ref,
-                "guide_asset": guide_asset,
-                "seed": child,
-                "timing_jitter_ms": round(bounded_jitter(child, -20, 20), 2),
-                "pitch_jitter_cents": round(bounded_jitter(child ^ 1, -8, 8), 2),
-            },
-            logs=[f"mock voice: singer={singer_ref} {duration}s"],
+    def analyze(self, sample_paths: list[Path], *, singer_ref: str) -> dict[str, Any]:
+        h = int.from_bytes(hashlib.blake2b(singer_ref.encode(), digest_size=8).digest(), "big")
+        return {"median_f0": 120.0 + (h % 120), "tint": (h >> 8) % 7}
+
+    def convert(
+        self, *, guide_path: Path, profile: dict[str, Any], params: dict[str, Any], seed: int
+    ) -> VoiceConversion:
+        from sr.common import dsp
+
+        stereo = dsp.load_stereo(guide_path)
+        mono = stereo.mean(axis=1)
+        detune = bounded_jitter(derive_seed(seed, "mock-voice"), -30, 30)
+        mono = dsp.pitch_shift_cents(mono.reshape(-1, 1), detune)[:, 0]
+        return VoiceConversion(
+            samples=mono.astype(np.float32),
+            sample_rate=dsp.SR,
+            provider=self.name,
+            provider_version=self.version,
+            metadata={"detune_cents": round(detune, 2), "profile": profile},
         )
 
 

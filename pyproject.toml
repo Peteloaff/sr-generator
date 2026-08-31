@@ -1,7 +1,7 @@
 [project]
 name = "sr-generator"
-version = "0.2.0"
-description = "SR Generator - private AI band music workstation (Stage 2: audio layering engine)"
+version = "0.3.0"
+description = "SR Generator - private AI band music workstation (Stage 3: singing-voice provider)"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",

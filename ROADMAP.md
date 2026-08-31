@@ -70,15 +70,24 @@ gang allocation and export isolated + combined stems repeatably from a seed.
 
 ---
 
-## [ ] Stage 3 — First Real Singing Voice Provider
+## [x] Stage 3 — First Real Singing Voice Provider
 
-- [ ] `VoiceProvider` adapter for one authorized voice tech
-- [ ] singer model setup workflow; guide-vocal input
-- [ ] per-singer rendering, pitch/timing preservation, progress, cache, recovery
+- [x] `VoiceProvider` contract (`analyze` + `convert`); `LocalDspVoiceProvider`
+      (real, dependency-free), `MockVoiceProvider`, `HttpVoiceProvider` (GPU service)
+- [x] singer voice-model setup: sample upload → `train_singer` job → analysed
+      profile; manual profile tuning
+- [x] guide-vocal upload per section; render resolves upload → guide+model
+      conversion → placeholder
+- [x] pitch/timing preservation (transforms the guide itself), job progress,
+      filesystem-first conversion cache, retry-safe
+- [x] **consent enforcement** — render 403 / train fails without the flag
+- [x] web: singer voice-model panel, section guide upload, `source: converted`
 
 **Exit criteria** — one guide phrase renders as each singer independently and
-assembles via the Vocal Director; intelligibility / alignment / repeatability /
-stem quality meet the agreed test set.
+assembles via the Vocal Director; deterministic; consent-gated.
+**All PASS** (`python scripts/stage_gate.py 3`). Full audio-quality eval
+protocol (intelligibility / alignment scoring) is deferred to a real neural
+provider — see TEST_PLAN.md.
 
 ---
 

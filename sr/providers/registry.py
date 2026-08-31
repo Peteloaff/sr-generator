@@ -8,10 +8,14 @@ from __future__ import annotations
 
 from sr.config import get_settings
 from sr.providers import base, mock
+from sr.providers.voice_http import HttpVoiceProvider
+from sr.providers.voice_local import LocalDspVoiceProvider
 
 _REGISTRY: dict[tuple[str, str], type[base.BaseProvider]] = {
     ("music", "mock"): mock.MockMusicProvider,
     ("voice", "mock"): mock.MockVoiceProvider,
+    ("voice", "local_dsp"): LocalDspVoiceProvider,
+    ("voice", "http"): HttpVoiceProvider,
     ("stem", "mock"): mock.MockStemProvider,
     ("analysis", "mock"): mock.MockAnalysisProvider,
     ("mastering", "mock"): mock.MockMasteringProvider,

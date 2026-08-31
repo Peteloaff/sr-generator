@@ -1,5 +1,43 @@
 # Changelog
 
+## [Stage 3] — Singing Voice Provider — 2026-08-31
+
+A guide vocal is now converted into each singer's voice. The conversion is real
+DSP (dependency-free); a neural model implements the same contract.
+
+### Added
+- **`VoiceProvider` contract** (`analyze(samples)` + `convert(guide, profile,
+  seed)`). Implementations: `LocalDspVoiceProvider` (default — pitch to register,
+  STFT formant warp, spectral tilt, breath, drive), `MockVoiceProvider` (fast
+  detune, tests), `HttpVoiceProvider` (POSTs to `SR_VOICE_HTTP_URL` — a local or
+  remote GPU model service).
+- **`sr/common/voice.py`**: `estimate_f0`, `analyze` → `VoiceProfile`
+  (median_f0 / formant / brightness / breathiness / roughness), `convert`.
+- **Singer voice model**: `Singer.voice_profile_json`; `POST /singers/{id}/samples`,
+  `train_singer` job (analyses samples → profile → `training_status=ready`),
+  `GET/PATCH /singers/{id}/voice-model` (manual tuning).
+- **Guide vocal**: `POST /songs/{id}/sections/{sid}/guide`. Render resolution
+  order per singer: uploaded take → guide + ready voice model (converted, cached)
+  → deterministic placeholder.
+- **Consent enforcement** (`sr/services/consent.py`): render is **403** if any
+  assigned singer lacks `consent_generation`; `train_singer` fails without
+  `consent_training`. Enforced at the API and again in the job.
+- **`RenderCache`** — voice conversions are filesystem-addressed (`cache/…`),
+  written before the render commits, so a retry after a rollback reuses them.
+- **Job progress** — `job.progress` advances through a render.
+- **Web**: singer voice-model panel (samples, train, profile sliders); section
+  guide-vocal upload; take breakdown shows `source: converted`.
+- 15 new tests (79 total); `stage_gate.py 3`.
+
+### Changed
+- `VoiceProvider.render()` replaced by `analyze()` + `convert()`.
+- `run_job` progress/cache use the handler's own session (SQLite single-writer
+  cannot grant a concurrent write transaction).
+- `render_voice` job type removed (voice rendering happens inside `render_section`).
+- `dsp._resample` → `dsp.resample` (public). Default `SR_VOICE_PROVIDER=local_dsp`.
+
+---
+
 ## [Stage 2] — Audio Layering Engine — 2026-08-31
 
 The Vocal Director's definitions now render into real, humanized, mixed audio.

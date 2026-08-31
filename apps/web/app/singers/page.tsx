@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { api, type Singer } from "@/lib/api";
+import VoiceModelPanel from "@/components/VoiceModel";
 
 export default function SingersPage() {
   const [singers, setSingers] = useState<Singer[]>([]);
   const [name, setName] = useState("");
+  const [open, setOpen] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   const refresh = () => api.listSingers().then(setSingers).catch((e) => setErr(String(e)));
@@ -24,12 +26,23 @@ export default function SingersPage() {
     }
   };
 
+  const consentBox = (s: Singer, field: "consent_training" | "consent_generation" | "consent_commercial", lbl: string) => (
+    <label>
+      <input
+        type="checkbox"
+        checked={s[field]}
+        onChange={(e) => api.updateSinger(s.id, { [field]: e.target.checked }).then(refresh)}
+      />{" "}
+      {lbl}
+    </label>
+  );
+
   return (
     <div>
       <h1>Singers</h1>
       <p className="muted">
-        Each singer is an independently modeled voice identity with its own consent
-        flags. Add as many as you need.
+        Each singer is an independently modeled voice identity. Training and voice
+        generation are blocked until the matching consent flag is set.
       </p>
       {err && <p className="danger">{err}</p>}
       <div className="row">
@@ -45,67 +58,44 @@ export default function SingersPage() {
         <thead>
           <tr>
             <th>Name</th>
-            <th>Clean</th>
-            <th>Scream</th>
             <th>Consent (train / gen / comm)</th>
-            <th>Training</th>
+            <th>Voice model</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
           {singers.map((s) => (
-            <tr key={s.id}>
-              <td>{s.name}</td>
-              <td>{s.clean_enabled ? "yes" : "no"}</td>
-              <td>{s.scream_enabled ? "yes" : "no"}</td>
-              <td>
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={s.consent_training}
-                    onChange={(e) =>
-                      api.updateSinger(s.id, { consent_training: e.target.checked }).then(refresh)
-                    }
-                  />{" "}
-                  train
-                </label>{" "}
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={s.consent_generation}
-                    onChange={(e) =>
-                      api.updateSinger(s.id, { consent_generation: e.target.checked }).then(refresh)
-                    }
-                  />{" "}
-                  gen
-                </label>{" "}
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={s.consent_commercial}
-                    onChange={(e) =>
-                      api.updateSinger(s.id, { consent_commercial: e.target.checked }).then(refresh)
-                    }
-                  />{" "}
-                  comm
-                </label>
-              </td>
-              <td>
-                <span className="pill">{s.training_status}</span>
-              </td>
-              <td>
-                <button
-                  className="danger"
-                  onClick={() => api.deleteSinger(s.id).then(refresh)}
-                >
-                  delete
-                </button>
-              </td>
-            </tr>
+            <Fragment key={s.id}>
+              <tr>
+                <td>{s.name}</td>
+                <td>
+                  {consentBox(s, "consent_training", "train")}{" "}
+                  {consentBox(s, "consent_generation", "gen")}{" "}
+                  {consentBox(s, "consent_commercial", "comm")}
+                </td>
+                <td>
+                  <button onClick={() => setOpen(open === s.id ? null : s.id)}>
+                    {open === s.id ? "close" : `${s.training_status}`}
+                  </button>
+                </td>
+                <td>
+                  <button className="danger" onClick={() => api.deleteSinger(s.id).then(refresh)}>
+                    delete
+                  </button>
+                </td>
+              </tr>
+              {open === s.id && (
+                <tr>
+                  <td colSpan={4}>
+                    <VoiceModelPanel singer={s} />
+                  </td>
+                </tr>
+              )}
+            </Fragment>
           ))}
           {singers.length === 0 && (
             <tr>
-              <td colSpan={6} className="muted">
+              <td colSpan={4} className="muted">
                 no singers yet
               </td>
             </tr>

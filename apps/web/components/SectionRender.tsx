@@ -35,6 +35,7 @@ export default function SectionRender({
   const [renders, setRenders] = useState<Job[]>([]);
   const [takeRows, setTakeRows] = useState<RenderTake[]>([]);
   const [roles, setRoles] = useState<VocalRole[]>([]);
+  const [guide, setGuide] = useState<AudioAsset | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -46,14 +47,18 @@ export default function SectionRender({
     .filter((s): s is Singer => !!s);
 
   const load = useCallback(async () => {
-    const [t, r, rl] = await Promise.all([
+    const [t, r, rl, sa] = await Promise.all([
       api.listSourceTakes(songId, sectionId),
       api.listSectionRenders(songId, sectionId),
       api.sectionRoles(sectionId),
+      api.listAssets(songId),
     ]);
     setTakes(t);
     setRenders(r);
     setRoles(rl);
+    setGuide(
+      sa.find((a) => a.asset_type === "guide_vocal" && a.section_id === sectionId) ?? null,
+    );
     if (r[0]) setTakeRows(await api.listRenderTakes(songId, r[0].id));
     else setTakeRows([]);
   }, [songId, sectionId]);
@@ -90,14 +95,45 @@ export default function SectionRender({
   const takenBy = new Set(takes.map((t) => t.singer_id));
   const nameOf = (id: string) => singers.find((s) => s.id === id)?.name ?? "?";
 
+  const uploadGuide = async (file: File) => {
+    setErr(null);
+    try {
+      await api.uploadGuide(songId, sectionId, file);
+      load();
+    } catch (e) {
+      setErr(String(e));
+    }
+  };
+
   return (
     <div className="section-render">
       {err && <p className="danger">{err}</p>}
 
+      <h4>Guide vocal</h4>
+      <p className="muted">
+        One melody/phrase for the section. Any singer with a ready voice model (and
+        no uploaded take) has the guide converted into their voice.
+      </p>
+      <div className="row">
+        {guide ? (
+          <>
+            <span className="pill">uploaded</span>
+            <audio controls preload="none" src={assetUrl(songId, guide.id, { inline: true })} />
+          </>
+        ) : (
+          <span className="muted">no guide vocal</span>
+        )}
+        <input
+          type="file"
+          accept="audio/*,.wav,.mp3,.flac,.m4a,.ogg"
+          onChange={(e) => e.target.files?.[0] && uploadGuide(e.target.files[0])}
+        />
+      </div>
+
       <h4>Source takes</h4>
       <p className="muted">
-        Upload each singer&apos;s recording of this section. Missing takes use a
-        deterministic placeholder so you can still hear the arrangement.
+        A real recording of a singer overrides both the guide conversion and the
+        placeholder for that singer.
       </p>
       <table>
         <tbody>
@@ -105,7 +141,9 @@ export default function SectionRender({
             <tr key={s.id}>
               <td>{s.name}</td>
               <td>
-                <span className="pill">{takenBy.has(s.id) ? "uploaded" : "placeholder"}</span>
+                <span className="pill">
+                  {takenBy.has(s.id) ? "uploaded" : guide ? "guide → voice" : "placeholder"}
+                </span>
               </td>
               <td>
                 <input

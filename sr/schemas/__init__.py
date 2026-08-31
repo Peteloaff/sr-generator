@@ -27,6 +27,7 @@ from sr.schemas.vocal import (
     VocalRoleRead,
     VocalRoleUpdate,
 )
+from sr.schemas.voice_model import VoiceModelRead, VoiceProfileUpdate
 
 __all__ = [
     "AudioAssetRead",
@@ -54,6 +55,8 @@ __all__ = [
     "JobRead",
     "RenderRequest",
     "RenderTakeRead",
+    "VoiceModelRead",
+    "VoiceProfileUpdate",
     "NormalizedShare",
     "VocalRoleCreate",
     "VocalRoleUpdate",
