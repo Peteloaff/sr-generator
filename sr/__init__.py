@@ -1,9 +1,10 @@
 """SR Generator - private AI band music workstation.
 
-Stage 6: Band DNA analysis. Point at a folder; every catalogue track becomes a
-reference and is analysed (BPM / key / tuning / structure / energy / embedding).
-Quality checks gate approval; a reproducible training manifest refuses incomplete
-metadata. No fine-tuning yet - this is dataset prep. See ROADMAP.md.
+Stage 7: Band-specific music generation. A band adapter is distilled from the
+approved Band DNA (character / tempo / key priors); the music provider renders a
+deterministic instrumental bed for a section, tempo-locked to the song, that band
+vocals then render over. The synth engine is a stand-in for a real generative
+model - swap SR_MUSIC_PROVIDER=http to point at one. See ROADMAP.md.
 """
 
-__version__ = "0.6.0"
+__version__ = "0.7.0"

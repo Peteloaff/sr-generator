@@ -58,6 +58,27 @@ class AudioAnalysis:
     provider_version: str
 
 
+@dataclass
+class MusicGeneration:
+    """A generated instrumental section as raw stereo audio + generation metadata."""
+
+    audio: np.ndarray
+    sample_rate: int
+    provider: str
+    provider_version: str
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class BandAdapterSpec:
+    """A trained band conditioning descriptor (character vector, key/tempo priors)."""
+
+    spec: dict[str, Any]
+    provider: str
+    provider_version: str
+    dataset_version: str
+
+
 class BaseProvider(abc.ABC):
     name: str = "base"
     version: str = "0.0.0"
@@ -67,8 +88,23 @@ class BaseProvider(abc.ABC):
 
 
 class MusicGenerationProvider(BaseProvider):
+    """Generates instrumental music, optionally conditioned on a band adapter
+    trained from the Band DNA. A real model (ACE-Step / MusicGen / ...)
+    implements this same interface, locally or via an HTTP GPU service."""
+
+    #: does this provider support training a band adapter / LoRA?
+    trains_adapter: bool = False
+
     @abc.abstractmethod
-    def generate(self, *, prompt: str, params: dict[str, Any], seed: int) -> ProviderResult: ...
+    def generate(
+        self, *, prompt: str, params: dict[str, Any], seed: int, adapter: dict[str, Any] | None
+    ) -> MusicGeneration:
+        """Generate one instrumental section."""
+
+    def train_adapter(
+        self, *, manifest: dict[str, Any], dna: dict[str, Any], params: dict[str, Any]
+    ) -> BandAdapterSpec:
+        raise NotImplementedError(f"{self.name} does not train adapters")
 
 
 class VoiceProvider(BaseProvider):

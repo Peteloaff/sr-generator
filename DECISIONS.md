@@ -350,3 +350,49 @@ snapshot file adds `snapshot_at` separately (metadata, not part of the identity)
 people with the same approved catalogue get byte-identical manifests. Re-running
 analysis with a new provider version changes `dataset_version` (correct - it's a
 different dataset).
+
+---
+
+## ADR-0022 — The Stage 7 music generator is a deterministic synth, not a model
+
+**Context.** Blueprint Stage 7 names an ACE-Step-class model. That needs a GPU,
+weights, a Python ML stack, and gives non-reproducible output - none of which
+fits "build the framework first, native Windows, add the heavy pieces last."
+
+**Decision.** `LocalSynthMusicProvider` is the default: `sr/common/musicgen.py`
+renders an instrumental from pure NumPy - drums quantised to the requested BPM, a
+diatonic chord progression in the requested key, bass/pad/arp/drone layers, all
+driven by `derive_seed`. It exercises every real seam (the provider contract, the
+`generate_instrumental` job, the bed→render wiring, the adapter conditioning
+path, the web flow) and is byte-reproducible from a seed. `HttpMusicProvider`
+points `SR_MUSIC_PROVIDER=http` at a real generative service implementing the
+same two endpoints; nothing else changes.
+
+**Consequences.** Stage 7's workflow is fully testable and gated today with no ML
+dependency. The synth won't be mistaken for the band - it's a scaffold that
+proves the plumbing. Swapping in a real model is a provider swap, and the
+tempo-lock / determinism / lineage tests still apply to its output (the gate
+checks detected BPM, not musical quality).
+
+---
+
+## ADR-0023 — A band adapter is distilled from the Band DNA, not trained from audio
+
+**Context.** Stage 6 already produces the reproducible artifact a model would
+fine-tune on (the strict manifest + `band_dna`: BPM/key/tuning distributions,
+mean spectral embedding, energy profile). Stage 7 needs "adapter/LoRA training"
+without a trainer.
+
+**Decision.** `train_band_adapter` reads the approved manifest and DNA and
+distils a compact conditioning spec - character (`brightness` from the spectral
+centroid, `drum_busy` from ZCR, `drive` from loudness), `tempo_prior` (median
+BPM), `key_prior` (modal key), `energy_profile` - stored as a `BandAdapter` row
+carrying the `dataset_version` it came from. `generate` conditions on that spec.
+A real provider's `train_adapter` gets the same manifest + DNA and returns its
+own `BandAdapterSpec` (opaque weights path or params); the row and the API are
+identical.
+
+**Consequences.** "Training" is fast, deterministic, and offline, and an adapter
+is traceable to an exact dataset. The distilled priors are coarse - a real model
+would learn far more from the same manifest - but the identity, storage,
+selection UI and generation-conditioning path are already in place for it.

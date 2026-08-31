@@ -10,6 +10,8 @@ from sr.config import get_settings
 from sr.providers import base, mock
 from sr.providers.analysis_http import HttpAnalysisProvider
 from sr.providers.analysis_local import LocalMirAnalysisProvider
+from sr.providers.music_http import HttpMusicProvider
+from sr.providers.music_local import LocalSynthMusicProvider
 from sr.providers.stem_http import HttpStemProvider
 from sr.providers.stem_local import CenterSplitStemProvider
 from sr.providers.voice_http import HttpVoiceProvider
@@ -17,6 +19,8 @@ from sr.providers.voice_local import LocalDspVoiceProvider
 
 _REGISTRY: dict[tuple[str, str], type[base.BaseProvider]] = {
     ("music", "mock"): mock.MockMusicProvider,
+    ("music", "local_synth"): LocalSynthMusicProvider,
+    ("music", "http"): HttpMusicProvider,
     ("voice", "mock"): mock.MockVoiceProvider,
     ("voice", "local_dsp"): LocalDspVoiceProvider,
     ("voice", "http"): HttpVoiceProvider,

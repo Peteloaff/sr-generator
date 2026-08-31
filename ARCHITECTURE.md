@@ -6,7 +6,9 @@
    exit criteria pass. See [ROADMAP.md](ROADMAP.md).
 2. **Providers are replaceable.** The app talks only to the ABCs in
    `sr/providers/base.py`. Swapping ACE-Step / RVC / anything must not touch code
-   outside `sr/providers/`.
+   outside `sr/providers/`. Voice, stem, analysis and music all have real
+   dependency-free default providers today; a neural/GPU implementation is a
+   registry entry + an env var.
 3. **Everything long-running is a job.** `GenerationJob` records seed, params,
    provider + version, input asset ids, logs, error, attempts, timing, outputs.
 4. **Assets are versioned and have lineage.** Every `AudioAsset` knows its
@@ -119,6 +121,37 @@ on read: the 100%-scaled split (`normalize_weights`) and — for ensemble roles
 (background / gang / harmony) — the integer take allocation via
 `largest_remainder_allocation`. Lead/double are always one take. The UI shows
 `Brian 70 → 7 takes` without ever mutating the stored weights.
+
+## Band-specific music generation (Stage 7)
+
+The approved Band DNA conditions a generated instrumental bed per section.
+
+```
+POST /bands/{id}/adapters/train {name}        -> train_band_adapter job
+  build_manifest(strict=True) + band_dna(band)
+  MusicGenerationProvider.train_adapter(manifest, dna) -> BandAdapterSpec
+    local_synth: distil -> {character:{brightness,drum_busy,drive},
+                            tempo_prior, key_prior, energy_profile, trained_from}
+  -> BandAdapter row (unique per (band, name)), carries the dataset_version
+
+POST /songs/{id}/sections/{sid}/generate-instrumental {prompt, seed, adapter_id, bpm, key, duration}
+  -> generate_music job
+  resolve bpm/key: request override > song > adapter prior
+  MusicGenerationProvider.generate(prompt, params, seed, adapter=spec) -> MusicGeneration
+    local_synth (sr/common/musicgen.py): kick/snare/hat quantised to bpm,
+      diatonic progression in key, sub bass, pad stack, arp, tonic drone; ADSR
+  write .../{section}/instrumental/canonical.wav
+  delete the section's prior instrumental_bed, add the new one
+  -> then render_section (Stage 2/3) mixes band vocals over it
+
+GET /songs/{id}/sections/{sid}/generations   GET/DELETE /adapters/{id}
+```
+
+Same seed + params + engine version → byte-identical WAV. `LocalSynthMusicProvider`
+is a deterministic stand-in; a real generative model (ACE-Step / MusicGen-class)
+implements the same `generate` (+ optional `train_adapter`) contract behind
+`SR_MUSIC_PROVIDER=http` (`HttpMusicProvider`). See ADR-0022 / ADR-0023 and
+`MODEL_SETUP.md`.
 
 ## Band DNA (Stage 6)
 

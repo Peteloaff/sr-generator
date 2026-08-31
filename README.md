@@ -6,11 +6,13 @@ deterministic, section- and line-level control over *which authorized singer
 performs each vocal part*, with weighted ensembles, harmonies, doubles, gang
 vocals, and screams.
 
-> **Status: Stage 6 (Band DNA Analysis) complete.** Point at a folder of your
-> catalogue → every track is analysed (BPM / key / tuning / structure), quality-
-> checked, and rolled into a reproducible training manifest. Stages 1–5
-> (workspace, layering, voice conversion, stack quality, stem separation)
-> underneath. No music model yet. See [ROADMAP.md](ROADMAP.md).
+> **Status: Stage 7 (Band-Specific Music Generation) complete.** A band adapter
+> is distilled from the approved Band DNA, and the music provider renders a
+> deterministic, tempo/key-locked instrumental bed per section that band vocals
+> render over. The generator is a NumPy synth engine standing in for a real
+> model — `SR_MUSIC_PROVIDER=http` swaps it with no API change. Stages 1–6
+> (workspace, layering, voice conversion, stack quality, stem separation, Band
+> DNA) underneath. See [ROADMAP.md](ROADMAP.md).
 
 ## What you can do today
 
@@ -36,6 +38,10 @@ vocals, and screams.
   track is analysed (BPM / key / tuning / structure / energy), quality-checked,
   and, once approved, rolled into a **reproducible training manifest** (refuses
   incomplete metadata).
+- **Generate a band instrumental**: on the Band DNA page, **Train band adapter**
+  from the approved catalogue; then on any section pick the adapter and
+  **Generate instrumental** — a deterministic bed locked to the song's tempo and
+  key, which the vocal render then mixes over. Same seed → identical bytes.
 - **Give each singer a voice**: upload training samples and run the analysis, or
   set the profile by hand (pitch / formant / brightness / breathiness /
   roughness). Training and generation are blocked until you grant consent.
@@ -86,14 +92,14 @@ npm run dev              # UI on http://localhost:3000
 
 ```
 sr/
-  api/          FastAPI app + routers (bands, singers, voice_models, songs, vocal, render, jobs)
+  api/          FastAPI app + routers (bands, singers, voice_models, songs, vocal, render, music, jobs)
   models/       SQLAlchemy ORM (the core data model)
   schemas/      Pydantic request/response models
-  services/     layering, render, consent, cache, presets, separation, assembly, references, manifest, dna, quality
-  providers/    ABCs + mock + local/http voice / stem / analysis providers + registry
+  services/     layering, render, consent, cache, presets, separation, assembly, references, manifest, dna, quality, music
+  providers/    ABCs + mock + local/http voice / stem / analysis / music providers + registry
   worker/       job queue backends, runner, handlers, progress, RQ entrypoint
   orchestrator/ generation pipeline definition (stubs for now)
-  common/       allocation, seeds, storage, resolver, audio, dsp, synth, voice, vocalfx, separation, analysis
+  common/       allocation, seeds, storage, resolver, audio, dsp, synth, voice, vocalfx, separation, analysis, musicgen
 alembic/        migrations
 apps/web/       Next.js UI (band switcher, song workspace, Vocal Director)
 scripts/        setup / dev / worker / test / stage_gate

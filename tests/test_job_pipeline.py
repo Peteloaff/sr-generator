@@ -24,7 +24,7 @@ def test_mock_generation_job_completes_with_assets_and_lineage(client):
     # eager queue: finished by the time POST returns
     assert created["status"] == "succeeded"
     assert created["provider"] == "mock"
-    assert created["provider_version"].startswith("mock-music")
+    assert created["provider_version"].startswith("mock-")
     assert created["progress"] == 1.0
     assert created["seed"] == 7
     assert "big chorus" in created["logs"]

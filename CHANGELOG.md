@@ -1,5 +1,48 @@
 # Changelog
 
+## [Stage 7] — Band-Specific Music Generation — 2026-08-31
+
+The approved Band DNA now conditions a generated instrumental bed per section,
+tempo/key-locked to the song, that band vocals render over. The generator is a
+deterministic synth engine standing in for a real model — the contract, jobs and
+UI don't change when you swap it.
+
+### Added
+- **`MusicGenerationProvider` contract** — `generate(prompt, params, seed, adapter)
+  -> MusicGeneration` and optional `train_adapter(manifest, dna, params)
+  -> BandAdapterSpec`. `LocalSynthMusicProvider` (default, `local_synth`):
+  `sr/common/musicgen.py` — a deterministic NumPy engine (kick/snare/hat off the
+  requested BPM, a diatonic chord progression in the requested key, sub bass, pad
+  stack, arp, tonic drone; ADSR, swing hint). `HttpMusicProvider` (`http` —
+  `POST {SR_MUSIC_HTTP_URL}/generate` → WAV, `POST /train-adapter` → JSON spec).
+  `MockMusicProvider` (near-silent noise, tests).
+- **`BandAdapter`** (`sr/models/band_adapter.py`, band-scoped, unique per name) —
+  `POST /bands/{id}/adapters/train` → `train_band_adapter` job builds the strict
+  training manifest + `band_dna` and distils them into `{character: {brightness,
+  drum_busy, drive}, tempo_prior, key_prior, energy_profile, trained_from}`,
+  stored with the `dataset_version` it came from. `GET /bands/{id}/adapters`,
+  `GET/DELETE /adapters/{id}`.
+- **`generate_instrumental` job** — `POST /songs/{id}/sections/{sid}/generate-instrumental`
+  `{prompt, seed, adapter_id, bpm, key, duration}`. Resolves tempo/key
+  (request override > song > adapter prior), renders a section-length bed,
+  deletes the section's prior `instrumental_bed` and writes the new one, so the
+  Stage 2/3 render mixes band vocals over it. `GET .../generations`. Every applied
+  value + child seed is in the job metadata; same seed → byte-identical WAV.
+- `AssetType.GENERATED_INSTRUMENTAL`; `JobType` `train_band_adapter` /
+  `generate_music`. `sr/common/analysis.estimate_bpm` reused to verify tempo-lock.
+- **Web**: Band DNA page trains / lists / deletes adapters (character vector +
+  `dataset_version` shown); section panel has an adapter picker + "Generate
+  instrumental" with an inline player.
+- 10 new tests (118 total); `stage_gate.py 7`.
+
+### Changed
+- `SR_MUSIC_PROVIDER` default `mock` → `local_synth`; added `SR_MUSIC_HTTP_URL`.
+- `MusicGenerationProvider.generate` signature changed (returns `MusicGeneration`);
+  the mock-generation job writes its placeholder WAV directly rather than through
+  the music provider.
+
+---
+
 ## [Stage 6] — Band DNA Analysis — 2026-08-31
 
 Point at a folder → a structured, quality-checked catalogue → a reproducible

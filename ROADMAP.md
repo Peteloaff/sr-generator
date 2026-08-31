@@ -148,13 +148,28 @@ reproducible dataset manifest. **All PASS** (`python scripts/stage_gate.py 6`).
 
 ---
 
-## [ ] Stage 7 — Band-Specific Music Generation R&D
+## [x] Stage 7 — Band-Specific Music Generation
 
-- [ ] `MusicGenerationProvider` (ACE-Step-class or best current option)
-- [ ] text/reference generation; adapter/LoRA training job; generation metadata
+- [x] `MusicGenerationProvider` contract (`generate` + optional `train_adapter`);
+      `LocalSynthMusicProvider` — deterministic NumPy instrumental engine
+      (`sr/common/musicgen.py`: kick/snare/hat, diatonic progression, bass, pads,
+      arp, tonic drone) that trains adapters; `HttpMusicProvider` (real generative
+      service: `POST /generate`, `POST /train-adapter`); `MockMusicProvider`
+- [x] `BandAdapter` — `train_band_adapter` job distils the approved Band DNA
+      (strict manifest + `band_dna`) into character / tempo-prior / key-prior /
+      energy-profile, stored with its `dataset_version`
+- [x] `generate_instrumental` job — `POST /songs/{id}/sections/{sid}/generate-instrumental`;
+      resolves bpm/key (request override > song > adapter prior), renders a
+      section bed, replaces the section's `instrumental_bed`, full lineage in the
+      job metadata (child seed + every applied value)
+- [x] web: Band DNA page trains / lists / deletes adapters; section panel picks an
+      adapter and generates the bed, which then feeds the Stage 2/3 render
 
 **Exit criteria** — repeatable instrumental sections useful for the band
-workflow, with zero UI coupling to the model.
+workflow, with zero UI coupling to the model. **All PASS**
+(`python scripts/stage_gate.py 7`). The synth engine is a deterministic stand-in
+for a real generative model — `SR_MUSIC_PROVIDER=http` swaps it with no API
+change (see MODEL_SETUP.md). Text-prompt full-song generation is Stage 8.
 
 ---
 

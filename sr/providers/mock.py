@@ -20,6 +20,7 @@ from sr.providers.base import (
     AudioAnalysis,
     AudioAnalysisProvider,
     MasteringProvider,
+    MusicGeneration,
     MusicGenerationProvider,
     ProviderResult,
     StemSeparation,
@@ -57,17 +58,25 @@ def _write_asset(key: str, duration_s: float) -> dict[str, Any]:
 
 class MockMusicProvider(MusicGenerationProvider):
     name = "mock"
-    version = "mock-music-0.1.0"
+    version = "mock-music-0.2.0"
+    trains_adapter = False
 
-    def generate(self, *, prompt: str, params: dict[str, Any], seed: int) -> ProviderResult:
+    def generate(
+        self, *, prompt: str, params: dict[str, Any], seed: int, adapter: dict[str, Any] | None
+    ) -> MusicGeneration:
+        from sr.common.dsp import SR
+
         duration = float(params.get("duration", 8.0))
-        key = f"generated/mock/music_{derive_seed(seed, 'music', prompt)}.wav"
-        out = _write_asset(key, duration)
-        out["asset_type"] = "section_render"
-        return self._result(
-            outputs=[out],
-            metadata={"prompt": prompt, "seed": seed, "params": params},
-            logs=[f"mock music: {duration}s from prompt {prompt!r}"],
+        n = max(1, int(duration * SR))
+        rng = np.random.default_rng(derive_seed(seed, "mock-music", prompt))
+        sig = (rng.standard_normal(n).astype(np.float32) * 0.03)
+        return MusicGeneration(
+            audio=np.stack([sig, sig], axis=1),
+            sample_rate=SR,
+            provider=self.name,
+            provider_version=self.version,
+            metadata={"prompt": prompt, "seed": seed, "bpm": params.get("bpm"),
+                      "key": params.get("key"), "adapter": bool(adapter)},
         )
 
 

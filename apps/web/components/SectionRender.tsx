@@ -4,8 +4,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   api,
   assetUrl,
+  getBandId,
   type ABResult,
   type AudioAsset,
+  type BandAdapter,
   type Job,
   type RenderTake,
   type Singer,
@@ -40,6 +42,9 @@ export default function SectionRender({
   const [guide, setGuide] = useState<AudioAsset | null>(null);
   const [presets, setPresets] = useState<VocalPreset[]>([]);
   const [ab, setAb] = useState<ABResult | null>(null);
+  const [adapters, setAdapters] = useState<BandAdapter[]>([]);
+  const [generations, setGenerations] = useState<Job[]>([]);
+  const [adapterId, setAdapterId] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -51,17 +56,22 @@ export default function SectionRender({
     .filter((s): s is Singer => !!s);
 
   const load = useCallback(async () => {
-    const [t, r, rl, sa, pr] = await Promise.all([
+    const bandId = getBandId() ?? (await api.listBands())[0]?.id ?? null;
+    const [t, r, rl, sa, pr, g, ad] = await Promise.all([
       api.listSourceTakes(songId, sectionId),
       api.listSectionRenders(songId, sectionId),
       api.sectionRoles(sectionId),
       api.listAssets(songId),
       api.listPresets(),
+      api.listGenerations(songId, sectionId),
+      bandId ? api.listAdapters(bandId) : Promise.resolve([] as BandAdapter[]),
     ]);
     setTakes(t);
     setRenders(r);
     setRoles(rl);
     setPresets(pr);
+    setGenerations(g);
+    setAdapters(ad);
     setGuide(
       sa.find((a) => a.asset_type === "guide_vocal" && a.section_id === sectionId) ?? null,
     );
@@ -155,6 +165,25 @@ export default function SectionRender({
     }
   };
 
+  const generateBed = async () => {
+    setBusy(true);
+    setErr(null);
+    try {
+      const job = await api.generateInstrumental(songId, sectionId, {
+        prompt: "band instrumental",
+        adapter_id: adapterId || null,
+      });
+      await api.waitJob(job.id);
+      await load();
+    } catch (e) {
+      setErr(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const lastGen = generations[0];
+
   return (
     <div className="section-render">
       {err && <p className="danger">{err}</p>}
@@ -182,6 +211,42 @@ export default function SectionRender({
           Use separated stems
         </button>
       </div>
+
+      <h4>Generated instrumental bed</h4>
+      <p className="muted">
+        Render a deterministic instrumental for this section with the music provider,
+        tempo/key-locked to the song. It becomes the section&apos;s bed, so band vocals
+        render over it.
+      </p>
+      <div className="row">
+        <select value={adapterId} onChange={(e) => setAdapterId(e.target.value)}>
+          <option value="">no adapter (priors from song)</option>
+          {adapters.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.name} · {a.dataset_version ?? "—"}
+            </option>
+          ))}
+        </select>
+        <button onClick={generateBed} disabled={busy}>
+          {busy ? "working…" : "Generate instrumental"}
+        </button>
+        {lastGen && (
+          <span className="muted">
+            {generations.length} generation{generations.length === 1 ? "" : "s"} · latest{" "}
+            {lastGen.status}
+          </span>
+        )}
+      </div>
+      {lastGen?.status === "succeeded" &&
+        lastGen.outputs
+          .filter((o) => o.asset_type === "instrumental_bed")
+          .map((o) => (
+            <div className="row" key={o.id}>
+              <span className="muted">{o.label}</span>
+              <audio controls preload="none" src={assetUrl(songId, o.id, { inline: true })} />
+              <a href={assetUrl(songId, o.id)}>download</a>
+            </div>
+          ))}
 
       <h4>Source takes</h4>
       <p className="muted">

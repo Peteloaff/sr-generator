@@ -3,6 +3,13 @@
 `scripts/test.ps1` runs ruff + pytest. `scripts/stage_gate.py <N>` checks a
 stage's exit criteria and prints PASS/FAIL.
 
+## Stage 7 — automated (118 tests total, all passing)
+
+| Area | File | Covers |
+|---|---|---|
+| Synth engine | `tests/test_musicgen.py` | `generate` deterministic per seed, differs across seeds; **output tempo-locked** (detected BPM within ±8 of request, 96 / 120 / 140); progression diatonic to the mode; character params change the audio; shape `(n,2)` + headroom ≤ 0.95 |
+| Band generation | `tests/test_stage7.py` | **adapter distilled from the DNA** (character keys, tempo prior in range, `trained_from.references == 3`, has a `dataset_version`); **generated instrumental repeatable** (identical bytes from a seed) + **tempo-locked** to the song; generated bed feeds a section render (`stem_instrumental` + `vocal_bus` + `mix`); **provider swappable** — `SR_MUSIC_PROVIDER=mock` gives the same job/asset flow |
+
 ## Stage 6 — automated (107 tests total, all passing)
 
 | Area | File | Covers |
@@ -68,7 +75,7 @@ stage's exit criteria and prints PASS/FAIL.
 |---|---|---|---|
 | 1 | Percentage normalization totals 100 / predictable rounding | 0 | ✅ `normalize_weights` |
 | 2 | Ensemble allocator 70/20/10 @ 10 → 7/2/1; largest-remainder otherwise | 0 | ✅ `largest_remainder_allocation` |
-| 3 | Seed determinism → same orchestration + humanization | 0 (seeds) / 2 (full) | ✅ `test_render_is_repeatable_from_a_seed` (master byte-identical) |
+| 3 | Seed determinism → same orchestration + humanization | 0 (seeds) / 2 (full) | ✅ `test_render_is_repeatable_from_a_seed` (master byte-identical); Stage 7 `test_generated_instrumental_is_repeatable_and_tempo_locked` |
 | 4 | Section isolation — regen Chorus 1 leaves Verse 1 assets | 5 / 9 | ✅ assembly: untouched windows byte-identical (`test_import_separate_replace_assemble`); per-asset isolation at Stage 9 |
 | 5 | Stem preservation — every render outputs stems + master | 2 | ✅ `test_render_produces_isolated_and_combined_stems` |
 | 6 | Voice isolation — singers independently selectable; disabling one doesn't corrupt others | 3 | ✅ per-singer voice models; `test_guide_is_converted_per_singer` shows independent renders |

@@ -53,18 +53,31 @@ def estimate_bpm(mono: np.ndarray, sr: int = SR) -> float:
     return round(float(bpm), 1)
 
 
+_CHROMA_WIN = 8192  # coarse FFT bins alias to the wrong pitch class - use a big window
+
+
 def _chroma(mono: np.ndarray, sr: int) -> np.ndarray:
-    spec = np.abs(stft(mono, _WIN, _HOP))
-    freqs = np.fft.rfftfreq(_WIN, 1.0 / sr)
-    mask = freqs > 40.0
-    freqs, spec = freqs[mask], spec[:, mask]
-    midi = 69 + 12 * np.log2(np.maximum(freqs, 1e-6) / 440.0)
-    pc = np.mod(np.round(midi).astype(int), 12)
+    win, hop = _CHROMA_WIN, _CHROMA_WIN // 2
+    spec = np.abs(stft(mono, win, hop))
+    if spec.shape[0] == 0:
+        return np.ones(12) / 12
+    freqs = np.fft.rfftfreq(win, 1.0 / sr)
+    mask = (freqs > 55.0) & (freqs < 2000.0)  # tonal range; skip sub-bass + cymbals
+    freqs = freqs[mask]
+    energy = spec[:, mask].mean(axis=0)
+    # whiten across the frame so broadband (percussive) energy does not dominate
+    energy = energy / (np.median(energy) + 1e-9)
+    energy *= 200.0 / freqs  # favour lower (more tonal) partials
+
+    midi = 69.0 + 12.0 * np.log2(np.maximum(freqs, 1e-6) / 440.0)
+    # only bins that sit within 25 cents of an equal-tempered note count
+    near = np.abs(midi - np.round(midi)) < 0.25
+    pc = np.mod(np.round(midi[near]).astype(int), 12)
     chroma = np.zeros(12, dtype=np.float64)
-    energy = spec.mean(axis=0)
     for c in range(12):
-        chroma[c] = energy[pc == c].sum()
-    return chroma / (chroma.sum() + 1e-9)
+        chroma[c] = energy[near][pc == c].sum()
+    total = chroma.sum()
+    return chroma / total if total > 0 else np.ones(12) / 12
 
 
 def estimate_key(mono: np.ndarray, sr: int = SR) -> dict:

@@ -102,6 +102,11 @@ export interface BandReference {
   analysis_status: string; analysis_provider: string | null;
   approved_for_training: boolean;
 }
+export interface BandAdapter {
+  id: string; band_id: string; name: string; provider: string; provider_version: string;
+  dataset_version: string | null; spec_json: Record<string, unknown>; is_active: boolean;
+  created_at: string;
+}
 export interface ABResult {
   seed: number; ensemble_job_id: string; flat_job_id: string;
   ensemble: Record<string, number | string>; flat: Record<string, number | string>;
@@ -242,6 +247,26 @@ export const api = {
       `/bands/${bandId}/training-manifest`,
       { method: "POST" },
     ),
+
+  trainAdapter: (bandId: string, name?: string) =>
+    req<Job>(`/bands/${bandId}/adapters/train`, {
+      method: "POST",
+      body: JSON.stringify(name ? { name } : {}),
+    }),
+  listAdapters: (bandId: string) => req<BandAdapter[]>(`/bands/${bandId}/adapters`),
+  deleteAdapter: (id: string) => req<void>(`/adapters/${id}`, { method: "DELETE" }),
+  generateInstrumental: (
+    songId: string,
+    sectionId: string,
+    body: { prompt?: string; seed?: number | null; adapter_id?: string | null;
+            bpm?: number | null; key?: string | null; duration?: number | null } = {},
+  ) =>
+    req<Job>(`/songs/${songId}/sections/${sectionId}/generate-instrumental`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  listGenerations: (songId: string, sectionId: string) =>
+    req<Job[]>(`/songs/${songId}/sections/${sectionId}/generations`),
 
   separateStems: (songId: string) =>
     req<Job>(`/songs/${songId}/separate`, { method: "POST" }),

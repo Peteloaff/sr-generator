@@ -94,6 +94,7 @@ class AssetType(StrEnum):
     MIX = "mix"
     MASTER = "master"
     SONG_MIX = "song_mix"  # full-song assembly (original mix + replaced sections)
+    GENERATED_INSTRUMENTAL = "generated_instrumental"  # music-model output for a section
     PROJECT_STATE = "project_state"
     OTHER = "other"
 

@@ -1,7 +1,9 @@
 # Model / Provider Setup
 
-**Voice** has a real provider (`local_dsp`, Stage 3). Music / stem / analysis /
-mastering / transcription are still `mock`. The contract every provider
+**Voice** (`local_dsp`, Stage 3), **stem** (`center_split`, Stage 5), **analysis**
+(`local_mir`, Stage 6) and **music** (`local_synth`, Stage 7) all have real
+default providers — dependency-free stand-ins that exercise the full contract.
+Mastering / transcription are still `mock`. The contract every provider
 implements is in `sr/providers/base.py`.
 
 **ffmpeg** is already handled: `imageio-ffmpeg` (a base dependency) ships a static
@@ -12,7 +14,7 @@ system install needed. ffprobe is not bundled — probing parses `ffmpeg -i`.
 
 | Kind | ABC | Selected by | Default | Real adapter |
 |---|---|---|---|---|
-| music | `MusicGenerationProvider` | `SR_MUSIC_PROVIDER` | `mock` | Stage 7 |
+| music | `MusicGenerationProvider` | `SR_MUSIC_PROVIDER` | **`local_synth`** | Stage 7 ✅ + generative model |
 | voice | `VoiceProvider` | `SR_VOICE_PROVIDER` | **`local_dsp`** | Stage 3 ✅ + neural |
 | stem | `StemSeparationProvider` | `SR_STEM_PROVIDER` | **`center_split`** | Stage 5 ✅ + Demucs |
 | analysis | `AudioAnalysisProvider` | `SR_ANALYSIS_PROVIDER` | **`local_mir`** | Stage 6 ✅ + librosa/model |
@@ -64,6 +66,40 @@ body, optional `X-Provider-Version` header). Then `SR_VOICE_PROVIDER=http`,
 Either way the app, the Vocal Director, caching, consent, and the layering engine
 are untouched — see `sr/providers/voice_http.py` for the wire format.
 
+## Music providers (Stage 7)
+
+| name | what it is | needs |
+|---|---|---|
+| `local_synth` (default) | deterministic NumPy instrumental engine (`sr/common/musicgen.py`) — drums quantised to the BPM, a diatonic progression in the key, bass/pad/arp/drone. Trains band adapters by distilling the Band DNA. Byte-reproducible from a seed. | nothing |
+| `mock` | near-silent stereo noise | nothing (fast tests) |
+| `http` | a real generative-music service | `SR_MUSIC_HTTP_URL`, `httpx` |
+
+**`MusicGenerationProvider` contract** — a real model implements:
+
+```python
+def generate(self, *, prompt: str, params: dict, seed: int, adapter: dict | None) -> MusicGeneration
+    # -> MusicGeneration(audio (n,2) float32, sample_rate, provider, provider_version, metadata)
+    # params carries bpm / key / duration; adapter is a BandAdapter.spec_json (or None)
+
+trains_adapter: bool = False
+def train_adapter(self, *, manifest: dict, dna: dict, params: dict) -> BandAdapterSpec
+    # the strict training manifest + band_dna -> a conditioning spec (opaque or explicit),
+    # stored as a BandAdapter row with its dataset_version
+```
+
+`train_band_adapter` calls `train_adapter`; `generate_instrumental` calls
+`generate` and wires the result in as the section's `instrumental_bed`.
+
+### Plugging in a generative model (ACE-Step / MusicGen-class)
+
+**Remote service** (recommended): `POST /generate` (JSON `{prompt, bpm, key,
+seconds, seed, adapter}` → WAV body, optional `X-Provider-Version`) and, if it
+supports adapters, `POST /train-adapter` (JSON `{manifest, dna, params}` → JSON
+spec). Then `SR_MUSIC_PROVIDER=http`, `SR_MUSIC_HTTP_URL=http://gpu-box:8200`.
+`HttpMusicProvider` is already written (`sr/providers/music_http.py`). The
+adapter row, the jobs, the section-bed wiring and the web flow don't change; the
+tempo-lock / determinism / lineage tests still apply to the model's output.
+
 ## Stem separation providers (Stage 5)
 
 | name | what it is | needs |
@@ -81,8 +117,9 @@ zip of named WAV stems (`vocals.wav`, `drums.wav`, …). Set
 ## Research targets (not commitments)
 
 - **Music generation:** ACE-Step 1.5-class open model with reference conditioning
-  and adapter/LoRA support. MusicGen/AudioCraft and successors evaluated through
-  the same `MusicGenerationProvider` contract.
+  and adapter/LoRA support, dropped in behind the Stage 7
+  `MusicGenerationProvider` contract (currently `local_synth`). MusicGen/AudioCraft
+  and successors evaluated the same way.
 - **Singing voice:** RVC / so-vits-svc / DiffSinger-class, per authorized singer,
   behind the `analyze`/`convert` contract above.
 - **Stem separation:** a Demucs-class separator.

@@ -592,9 +592,112 @@ def stage6(client) -> list[Row]:
     return rows
 
 
+def stage7(client) -> list[Row]:
+    import hashlib
+    import io as _io
+
+    import numpy as np
+    import soundfile as sf
+
+    from sr.common.analysis import estimate_bpm
+
+    rows: list[Row] = []
+    sr = 44100
+    cat = Path(tempfile.mkdtemp()) / "cat"
+    cat.mkdir()
+    for nm, bpm, notes in (
+        ("a.wav", 124, (220.0, 261.63, 329.63)),
+        ("b.wav", 124, (196.0, 246.94, 293.66)),
+        ("c.wav", 120, (261.63, 329.63, 392.0)),
+    ):
+        t = np.arange(int(sr * 26)) / sr
+        ch = sum(0.12 * np.sin(2 * np.pi * f * t) for f in notes)
+        d = np.zeros_like(t)
+        for beat in np.arange(0, 26, 60 / bpm):
+            i = int(beat * sr)
+            rng = np.random.default_rng(int(beat * 7))
+            d[i : i + 220] += np.exp(-np.linspace(0, 10, 220)) * rng.standard_normal(220) * 0.35
+        m = (ch + d * 0.5).astype("float32")
+        sf.write(cat / nm, np.stack([m, m * 0.92], axis=1), sr)
+
+    band = client.get("/bands").json()[0]["id"]
+    ij = client.post(
+        f"/bands/{band}/references/import-folder",
+        json={"path": str(cat), "recursive": False},
+    ).json()
+    client.post(f"/jobs/{ij['id']}/wait", params={"timeout": 120})
+    for r in client.get(f"/bands/{band}/references").json():
+        if r["quality_json"]["passed"]:
+            client.patch(f"/references/{r['id']}", json={"approved_for_training": True})
+
+    try:
+        tj = client.post(f"/bands/{band}/adapters/train", json={"name": "band"}).json()
+        tj = client.post(f"/jobs/{tj['id']}/wait", params={"timeout": 120}).json()
+        adapter = client.get(f"/bands/{band}/adapters").json()[0]
+        ok = (
+            tj["status"] == "succeeded"
+            and adapter["dataset_version"]
+            and set(adapter["spec_json"]["character"]) == {"brightness", "drum_busy", "drive"}
+        )
+        rows.append(("Train a band adapter from the DNA", ok, adapter["dataset_version"][:12]))
+
+        song = client.post(
+            "/songs", json={"title": "Gate Gen", "seed": 11, "bpm": 128, "key": "E minor"}
+        ).json()["id"]
+        sec = client.post(
+            f"/songs/{song}/sections",
+            json={"section_type": "chorus", "start_time": 0, "end_time": 6},
+        ).json()["id"]
+
+        def gen():
+            j = client.post(
+                f"/songs/{song}/sections/{sec}/generate-instrumental",
+                json={"prompt": "chorus", "adapter_id": adapter["id"], "seed": 11},
+            ).json()
+            j = client.post(f"/jobs/{j['id']}/wait", params={"timeout": 120}).json()
+            bed = next(
+                a for a in client.get(f"/songs/{song}/assets").json()
+                if a["asset_type"] == "instrumental_bed" and a["generation_job_id"] == j["id"]
+            )
+            return j, client.get(f"/songs/{song}/assets/{bed['id']}/download").content
+
+        j1, b1 = gen()
+        _, b2 = gen()
+        rows.append((
+            "Generated instrumental is repeatable from a seed",
+            hashlib.sha256(b1).hexdigest() == hashlib.sha256(b2).hexdigest(), "sha256",
+        ))
+        data, _ = sf.read(_io.BytesIO(b1), always_2d=True)
+        det = estimate_bpm(data.mean(axis=1))
+        rows.append((
+            "Generated section is tempo-locked to the request",
+            abs(det - 128) <= 8, f"detected {det:.0f} / 128",
+        ))
+
+        sid = client.post("/singers", json={"name": "Brian"}).json()["id"]
+        client.patch(f"/singers/{sid}", json={"consent_generation": True})
+        client.patch(f"/singers/{sid}/voice-model", json={"median_f0": 130.0})
+        client.post(
+            f"/sections/{sec}/roles",
+            json={"role_type": "lead", "assignments": [{"singer_id": sid}]},
+        )
+        rj = client.post(f"/songs/{song}/sections/{sec}/render", json={}).json()
+        rj = client.post(f"/jobs/{rj['id']}/wait", params={"timeout": 120}).json()
+        kinds = {a["asset_type"] for a in client.get(f"/songs/{song}/assets").json()}
+        rows.append((
+            "Band vocals render over the generated instrumental",
+            rj["status"] == "succeeded" and {"stem_instrumental", "vocal_bus", "mix"} <= kinds,
+            "section mix",
+        ))
+    except Exception as exc:  # noqa: BLE001
+        rows.append(("Band-specific music generation", False, repr(exc)))
+
+    return rows
+
+
 STAGES = {
     "0": stage0, "1": stage1, "2": stage2, "3": stage3, "4": stage4,
-    "5": stage5, "6": stage6,
+    "5": stage5, "6": stage6, "7": stage7,
 }
 
 

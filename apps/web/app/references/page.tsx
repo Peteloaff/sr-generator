@@ -1,26 +1,29 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { api, getBandId, type BandReference } from "@/lib/api";
+import { api, getBandId, type BandAdapter, type BandReference } from "@/lib/api";
 
 export default function ReferencesPage() {
   const [bandId, setBandId] = useState<string | null>(null);
   const [refs, setRefs] = useState<BandReference[]>([]);
   const [dna, setDna] = useState<Record<string, unknown> | null>(null);
   const [manifest, setManifest] = useState<{ status: number; body: unknown } | null>(null);
+  const [adapters, setAdapters] = useState<BandAdapter[]>([]);
   const [folder, setFolder] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   const load = useCallback(async (bid: string) => {
-    const [r, d, m] = await Promise.all([
+    const [r, d, m, a] = await Promise.all([
       api.listReferences(bid),
       api.bandDna(bid),
       api.trainingManifest(bid),
+      api.listAdapters(bid),
     ]);
     setRefs(r);
     setDna(d);
     setManifest(m);
+    setAdapters(a);
   }, []);
 
   useEffect(() => {
@@ -223,6 +226,75 @@ export default function ReferencesPage() {
           </div>
         </div>
       ) : null}
+
+      <h2>Band adapters</h2>
+      <p className="muted">
+        An adapter distils the approved Band DNA into character / tempo / key priors.
+        The music provider conditions on it when generating a section instrumental.
+      </p>
+      <div className="row">
+        <button
+          disabled={!!busy || manifest?.status !== 200}
+          onClick={() =>
+            run("train", () => api.trainAdapter(bandId!, "band"))
+          }
+        >
+          {busy === "train" ? "training…" : "Train band adapter"}
+        </button>
+        {manifest?.status !== 200 && (
+          <span className="muted">approve references and resolve the manifest first</span>
+        )}
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Provider</th>
+            <th>dataset_version</th>
+            <th>Character</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {adapters.map((a) => {
+            const ch = (a.spec_json.character ?? {}) as Record<string, number>;
+            return (
+              <tr key={a.id}>
+                <td>{a.name}</td>
+                <td className="muted">{a.provider_version}</td>
+                <td>
+                  <code>{a.dataset_version ?? "—"}</code>
+                </td>
+                <td className="muted">
+                  {Object.entries(ch)
+                    .map(([k, v]) => `${k} ${v.toFixed(2)}`)
+                    .join(" · ") || "—"}
+                </td>
+                <td>
+                  <button
+                    className="danger"
+                    onClick={() =>
+                      run("del", async () => {
+                        await api.deleteAdapter(a.id);
+                        return {};
+                      })
+                    }
+                  >
+                    delete
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
+          {adapters.length === 0 && (
+            <tr>
+              <td colSpan={5} className="muted">
+                no adapters yet
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
     </div>
   );
 }

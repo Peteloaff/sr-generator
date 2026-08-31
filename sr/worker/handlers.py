@@ -33,11 +33,20 @@ def _seed(job: GenerationJob) -> int:
 
 
 def _mock_generation(job: GenerationJob, db: Session) -> base.ProviderResult:
+    """A minimal job that writes one silent WAV - the Stage 0 pipeline smoke test."""
+    from sr.common.seeds import derive_seed
+    from sr.providers.mock import _write_asset
+
     params = job.parameters_json or {}
-    provider = get_provider("music")
-    job.append_log(f"provider={provider.name}@{provider.version} seed={_seed(job)}")
-    return provider.generate(
-        prompt=str(params.get("prompt", "untitled")), params=params, seed=_seed(job)
+    prompt = str(params.get("prompt", "untitled"))
+    duration = float(params.get("duration", 8.0))
+    key = f"generated/mock/music_{derive_seed(_seed(job), 'music', prompt)}.wav"
+    spec = _write_asset(key, duration)
+    spec["asset_type"] = "section_render"
+    return base.ProviderResult(
+        provider="mock", provider_version="mock-gen-0.1.0", outputs=[spec],
+        metadata={"prompt": prompt, "seed": _seed(job)},
+        logs=[f"mock generation: {duration}s from prompt {prompt!r}"],
     )
 
 
@@ -81,6 +90,26 @@ def _separate_stems(job: GenerationJob, db: Session) -> base.ProviderResult:
     from sr.services.separation import separate_song
 
     return separate_song(db, job, song_id=job.song_id, params=job.parameters_json or {})
+
+
+def _train_band_adapter(job: GenerationJob, db: Session) -> base.ProviderResult:
+    from sr.services.music import train_band_adapter
+
+    if not job.parameters_json or not job.parameters_json.get("band_id"):
+        raise ValueError("train_band_adapter job requires band_id")
+    return train_band_adapter(
+        db, job, band_id=job.parameters_json["band_id"], params=job.parameters_json
+    )
+
+
+def _generate_music(job: GenerationJob, db: Session) -> base.ProviderResult:
+    from sr.services.music import generate_instrumental
+
+    if not job.section_id:
+        raise ValueError("generate_music job requires section_id")
+    return generate_instrumental(
+        db, job, section_id=job.section_id, seed=_seed(job), params=job.parameters_json or {}
+    )
 
 
 def _assemble_song(job: GenerationJob, db: Session) -> base.ProviderResult:
@@ -152,6 +181,8 @@ _HANDLERS: dict[str, Handler] = {
     "mock_generation": _mock_generation,
     "analyze_reference": _analyze_reference,
     "import_folder": _import_folder,
+    "train_band_adapter": _train_band_adapter,
+    "generate_music": _generate_music,
     "separate_stems": _separate_stems,
     "assemble_song": _assemble_song,
     "train_singer": _train_singer,
