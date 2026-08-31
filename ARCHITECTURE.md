@@ -120,6 +120,32 @@ on read: the 100%-scaled split (`normalize_weights`) and — for ensemble roles
 `largest_remainder_allocation`. Lead/double are always one take. The UI shows
 `Brian 70 → 7 takes` without ever mutating the stored weights.
 
+## Stem separation + song editing (Stage 5)
+
+The "replace a cover's vocal, keep the melody" path — it reuses everything above.
+
+```
+POST /songs/{id}/separate           -> separate_stems job
+  StemSeparationProvider.separate(canonical mix)
+    center_split: mid/side STFT -> per-bin mask (loud in mid, quiet in side = voice)
+    -> stem_lead_vocal + stem_instrumental  (song-level AudioAssets, versioned)
+
+POST /sections/{sid}/use-derived-stems
+  slice the separated stems to [start, end] -> section guide_vocal + instrumental_bed
+
+(then: add roles -> render_section  -- Stage 3 converts the guide into each singer,
+ Stage 2 mixes over the derived instrumental)
+
+POST /songs/{id}/assemble            -> assemble_song job
+  out = original recording (copy)
+  for each section with a succeeded render:
+      out[start:end] = derived_instrumental[start:end] + rendered vocal_bus  (crossfaded)
+  -> song_mix AudioAsset (versioned). Untouched ranges are byte-identical.
+```
+
+`CenterSplitStemProvider` is real but crude; a Demucs-class model implements the
+same `separate` contract (`SR_STEM_PROVIDER=http` + `HttpStemProvider`).
+
 ## Vocal-stack quality (Stage 4)
 
 - **Harmony intervals** — `VocalAssignment.interval_semitones`; `plan_role_takes`

@@ -3,7 +3,14 @@
 `scripts/test.ps1` runs ruff + pytest. `scripts/stage_gate.py <N>` checks a
 stage's exit criteria and prints PASS/FAIL.
 
-## Stage 4 — automated (112 tests total, all passing)
+## Stage 5 — automated (98 tests total, all passing)
+
+| Area | File | Covers |
+|---|---|---|
+| Separation DSP | `tests/test_separation.py` | vocal + instrumental sum back to the mix (`atol 1e-4`); the vocal is more centred than the mix; deterministic |
+| Cover workflow | `tests/test_stage5.py` | **import → separate → use-derived-stems → render → assemble**; song stems versioned (re-separate → v2); assembled mix: replaced section differs, **untouched window `np.array_equal` to the original**; separate without upload → 422; assemble with no renders → job fails cleanly |
+
+## Stage 4 — automated (92 tests, all passing)
 
 | Area | File | Covers |
 |---|---|---|
@@ -55,7 +62,7 @@ stage's exit criteria and prints PASS/FAIL.
 | 1 | Percentage normalization totals 100 / predictable rounding | 0 | ✅ `normalize_weights` |
 | 2 | Ensemble allocator 70/20/10 @ 10 → 7/2/1; largest-remainder otherwise | 0 | ✅ `largest_remainder_allocation` |
 | 3 | Seed determinism → same orchestration + humanization | 0 (seeds) / 2 (full) | ✅ `test_render_is_repeatable_from_a_seed` (master byte-identical) |
-| 4 | Section isolation — regen Chorus 1 leaves Verse 1 assets | 9 | 🟡 renders are per-section jobs; explicit isolation test at Stage 9 |
+| 4 | Section isolation — regen Chorus 1 leaves Verse 1 assets | 5 / 9 | ✅ assembly: untouched windows byte-identical (`test_import_separate_replace_assemble`); per-asset isolation at Stage 9 |
 | 5 | Stem preservation — every render outputs stems + master | 2 | ✅ `test_render_produces_isolated_and_combined_stems` |
 | 6 | Voice isolation — singers independently selectable; disabling one doesn't corrupt others | 3 | ✅ per-singer voice models; `test_guide_is_converted_per_singer` shows independent renders |
 | 7 | Consent enforcement — render fails safely when a flag is missing | 3 | ✅ `test_render_blocked_without_consent`, `test_train_without_consent_is_403` |

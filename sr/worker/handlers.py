@@ -47,10 +47,19 @@ def _analyze_reference(job: GenerationJob, db: Session) -> base.ProviderResult:
 
 
 def _separate_stems(job: GenerationJob, db: Session) -> base.ProviderResult:
-    params = job.parameters_json or {}
-    return get_provider("stem").separate(
-        source_asset=str(params.get("source_asset", "")), params=params
-    )
+    if not job.song_id:
+        raise ValueError("separate_stems job requires song_id")
+    from sr.services.separation import separate_song
+
+    return separate_song(db, job, song_id=job.song_id, params=job.parameters_json or {})
+
+
+def _assemble_song(job: GenerationJob, db: Session) -> base.ProviderResult:
+    if not job.song_id:
+        raise ValueError("assemble_song job requires song_id")
+    from sr.services.assembly import assemble_song
+
+    return assemble_song(db, job, song_id=job.song_id, params=job.parameters_json or {})
 
 
 def _train_singer(job: GenerationJob, db: Session) -> base.ProviderResult:
@@ -114,6 +123,7 @@ _HANDLERS: dict[str, Handler] = {
     "mock_generation": _mock_generation,
     "analyze_reference": _analyze_reference,
     "separate_stems": _separate_stems,
+    "assemble_song": _assemble_song,
     "train_singer": _train_singer,
     "render_section": _render_section,
     "master": _master,

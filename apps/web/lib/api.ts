@@ -105,6 +105,7 @@ export interface NormalizedShare {
 export interface AudioAsset {
   id: string; asset_type: string; label: string | null; file_path: string;
   duration: number | null; sample_rate: number | null; channels: number | null;
+  version: number;
   singer_id: string | null; section_id: string | null; generation_job_id: string | null;
 }
 export interface Waveform { asset_id: string; buckets: number; duration: number | null; peaks: number[][] }
@@ -206,6 +207,17 @@ export const api = {
       method: "POST",
       body: JSON.stringify({}),
     }),
+
+  separateStems: (songId: string) =>
+    req<Job>(`/songs/${songId}/separate`, { method: "POST" }),
+  listSongStems: (songId: string) => req<AudioAsset[]>(`/songs/${songId}/stems`),
+  useDerivedStems: (songId: string, sectionId: string) =>
+    req<AudioAsset[]>(`/songs/${songId}/sections/${sectionId}/use-derived-stems`, {
+      method: "POST",
+    }),
+  assembleSong: (songId: string) =>
+    req<Job>(`/songs/${songId}/assemble`, { method: "POST" }),
+  listSongMixes: (songId: string) => req<AudioAsset[]>(`/songs/${songId}/mixes`),
 
   getVoiceModel: (singerId: string) => req<VoiceModel>(`/singers/${singerId}/voice-model`),
   setVoiceProfile: (singerId: string, patch: VoiceProfile) =>

@@ -1,9 +1,9 @@
 """SR Generator - private AI band music workstation.
 
-Stage 4: vocal-stack quality. Harmony intervals, a de-ess / EQ / compressor
-chain per role, stack-gain compensation, savable vocal presets, and an A/B that
-proves ensemble mode is measurably wider than a naive gain stack with no phase
-collapse. See ROADMAP.md.
+Stage 5: stem separation + song editing. Import a cover, separate the vocal from
+the instrumental (center-channel DSP; a Demucs-class model plugs into the same
+contract), wire the derived stems into a section, render it with band singers,
+and assemble a full mix - untouched sections stay byte-identical. See ROADMAP.md.
 """
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"

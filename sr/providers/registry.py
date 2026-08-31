@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from sr.config import get_settings
 from sr.providers import base, mock
+from sr.providers.stem_http import HttpStemProvider
+from sr.providers.stem_local import CenterSplitStemProvider
 from sr.providers.voice_http import HttpVoiceProvider
 from sr.providers.voice_local import LocalDspVoiceProvider
 
@@ -17,6 +19,8 @@ _REGISTRY: dict[tuple[str, str], type[base.BaseProvider]] = {
     ("voice", "local_dsp"): LocalDspVoiceProvider,
     ("voice", "http"): HttpVoiceProvider,
     ("stem", "mock"): mock.MockStemProvider,
+    ("stem", "center_split"): CenterSplitStemProvider,
+    ("stem", "http"): HttpStemProvider,
     ("analysis", "mock"): mock.MockAnalysisProvider,
     ("mastering", "mock"): mock.MockMasteringProvider,
     ("transcription", "mock"): mock.MockTranscriptionProvider,

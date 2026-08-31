@@ -15,6 +15,7 @@ import {
 import Waveform, { sectionColor } from "@/components/Waveform";
 import VocalDirector from "@/components/VocalDirector";
 import SectionRender from "@/components/SectionRender";
+import CoverStudio from "@/components/CoverStudio";
 
 export default function SongWorkspace({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -115,6 +116,13 @@ export default function SongWorkspace({ params }: { params: Promise<{ id: string
         accept="audio/*,.wav,.mp3,.flac,.m4a,.ogg"
         onChange={(e) => e.target.files?.[0] && onUpload(e.target.files[0])}
       />
+
+      {asset && (
+        <>
+          <h2>Cover studio</h2>
+          <CoverStudio songId={id} />
+        </>
+      )}
 
       <h2>Sections</h2>
       <table>

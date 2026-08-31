@@ -16,6 +16,7 @@ from sr.api.routers import (
     projects,
     render,
     singers,
+    song_edit,
     songs,
     vocal,
     voice_models,
@@ -55,7 +56,7 @@ def create_app() -> FastAPI:
 
     for module in (
         health, bands, singers, voice_models, projects, songs,
-        vocal, presets, render, jobs,
+        vocal, presets, render, song_edit, jobs,
     ):
         app.include_router(module.router)
 

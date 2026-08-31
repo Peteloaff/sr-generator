@@ -277,3 +277,38 @@ machine-checkable verdict. The gate asserts on that verdict.
 
 **Consequences.** "It sounds more produced" becomes a number. Both renders are
 kept as normal jobs (with `result_json`), so the UI can play them side by side.
+
+---
+
+## ADR-0018 — Center-channel separation, not a bundled neural model
+
+**Context.** Stage 5 needs to lift a vocal + instrumental out of a stereo cover.
+Demucs / MDX are multi-hundred-MB PyTorch models with a GPU appetite.
+
+**Decision.** `CenterSplitStemProvider` — a soft-mask center-channel separation
+in pure NumPy (`sr/common/separation.py`): STFT the mid (L+R) and side (L-R),
+build a per-bin mask that keeps energy loud in mid but quiet in side (phantom-
+centre vocal), band-limit it, and set `instrumental = mix - vocal`. Deterministic
+and dependency-free.
+
+**Consequences.** Good enough to get a usable guide vocal + instrumental so the
+cover-replacement workflow works end to end. Quality is nowhere near Demucs on
+dense mixes — a real separator drops in via `SR_STEM_PROVIDER=http`
+(`HttpStemProvider`, already written) or a new local provider, no engine changes.
+
+---
+
+## ADR-0019 — Assembly splices onto the original, it does not reconstruct
+
+**Context.** "Export a new mix without touching unrelated sections." If untouched
+sections were rebuilt from `separated_instrumental + separated_vocal`, they would
+drift from the original (separation is lossy).
+
+**Decision.** `assemble_song` starts from a byte copy of the original recording
+and only overwrites the time ranges of sections that have a render, with short
+(~12 ms) crossfades at the edges. Untouched ranges are the original samples,
+unchanged.
+
+**Consequences.** "Unrelated sections untouched" is literally true and testable
+(`np.array_equal` on a window). The replaced windows use the *separated*
+instrumental (so the old vocal is gone there) plus the new band vocal.

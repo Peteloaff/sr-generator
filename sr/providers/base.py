@@ -38,6 +38,17 @@ class VoiceConversion:
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
+@dataclass
+class StemSeparation:
+    """Separated stems as raw stereo audio: ``{"stem_lead_vocal": (n, 2), ...}``."""
+
+    stems: dict[str, np.ndarray]
+    sample_rate: int
+    provider: str
+    provider_version: str
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
 class BaseProvider(abc.ABC):
     name: str = "base"
     version: str = "0.0.0"
@@ -77,8 +88,15 @@ class VoiceProvider(BaseProvider):
 
 
 class StemSeparationProvider(BaseProvider):
+    """Splits a full mix into stems. A Demucs-class model implements this same
+    interface, locally or as an HTTP GPU service."""
+
+    #: stem asset_types this provider can produce
+    produces: tuple[str, ...] = ("stem_lead_vocal", "stem_instrumental")
+
     @abc.abstractmethod
-    def separate(self, *, source_asset: str, params: dict[str, Any]) -> ProviderResult: ...
+    def separate(self, *, source_path: Path, params: dict[str, Any]) -> StemSeparation:
+        """Separate the audio at ``source_path`` into raw stereo stems."""
 
 
 class AudioAnalysisProvider(BaseProvider):

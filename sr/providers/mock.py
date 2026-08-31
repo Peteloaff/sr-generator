@@ -21,6 +21,7 @@ from sr.providers.base import (
     MasteringProvider,
     MusicGenerationProvider,
     ProviderResult,
+    StemSeparation,
     StemSeparationProvider,
     TranscriptionProvider,
     VoiceConversion,
@@ -99,17 +100,22 @@ class MockVoiceProvider(VoiceProvider):
 class MockStemProvider(StemSeparationProvider):
     name = "mock"
     version = "mock-stem-0.1.0"
+    produces = ("stem_lead_vocal", "stem_instrumental")
 
-    def separate(self, *, source_asset: str, params: dict[str, Any]) -> ProviderResult:
-        duration = float(params.get("duration", 8.0))
-        stems = ["stem_drums", "stem_bass", "stem_guitars", "stem_lead_vocal", "stem_instrumental"]
-        outputs = []
-        for st in stems:
-            key = f"stems/mock/{st}_{derive_seed(1, source_asset, st)}.wav"
-            o = _write_asset(key, duration)
-            o["asset_type"] = st
-            outputs.append(o)
-        return self._result(outputs=outputs, logs=[f"mock stems from {source_asset}"])
+    def separate(self, *, source_path: Path, params: dict[str, Any]) -> StemSeparation:
+        from sr.common import dsp
+
+        stereo = dsp.load_stereo(Path(source_path))
+        # trivial split: centre -> "vocal", the rest -> "instrumental"
+        mid = 0.5 * (stereo[:, 0] + stereo[:, 1])
+        vocal = np.stack([mid, mid], axis=1).astype(np.float32)
+        return StemSeparation(
+            stems={"stem_lead_vocal": vocal, "stem_instrumental": (stereo - vocal)},
+            sample_rate=dsp.SR,
+            provider=self.name,
+            provider_version=self.version,
+            metadata={"note": "mock centre split"},
+        )
 
 
 class MockAnalysisProvider(AudioAnalysisProvider):

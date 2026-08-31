@@ -6,10 +6,11 @@ deterministic, section- and line-level control over *which authorized singer
 performs each vocal part*, with weighted ensembles, harmonies, doubles, gang
 vocals, and screams.
 
-> **Status: Stage 4 (Vocal-Stack Quality) complete.** Harmony intervals, a
-> de-ess/EQ/compressor chain per role, savable presets, and an A/B that proves
-> ensemble mode beats a naive gain stack. A guide vocal is converted into each
-> singer's voice (Stage 3). No music model yet. See [ROADMAP.md](ROADMAP.md).
+> **Status: Stage 5 (Stem Separation + Song Editing) complete.** Import a cover,
+> separate the vocal from the instrumental, replace the vocal with your singers,
+> and assemble a new mix — untouched sections stay byte-identical. Stages 1–4
+> (workspace, layering, voice conversion, stack quality) underneath. No music
+> model yet. See [ROADMAP.md](ROADMAP.md).
 
 ## What you can do today
 
@@ -26,6 +27,10 @@ vocals, and screams.
 - **Save a stack as a preset** and drop it on any section; **Render A/B** to see
   ensemble mode measured against a naive gain stack (stereo width, L/R
   correlation, mono-compatibility).
+- **Cover a song**: upload the mix, hit **Separate stems**, per section click
+  **Use separated stems** (the separated vocal becomes the guide, the
+  instrumental the bed), render with your singers, then **Assemble full mix** —
+  the sections you didn't touch come out exactly as they were recorded.
 - **Give each singer a voice**: upload training samples and run the analysis, or
   set the profile by hand (pitch / formant / brightness / breathiness /
   roughness). Training and generation are blocked until you grant consent.
@@ -79,11 +84,11 @@ sr/
   api/          FastAPI app + routers (bands, singers, voice_models, songs, vocal, render, jobs)
   models/       SQLAlchemy ORM (the core data model)
   schemas/      Pydantic request/response models
-  services/     normalization, layering, render, consent, cache, presets, project i/o
-  providers/    ABCs + mock + local_dsp/http voice providers + registry
+  services/     normalization, layering, render, consent, cache, presets, separation, assembly, project i/o
+  providers/    ABCs + mock + local/http voice + stem providers + registry
   worker/       job queue backends, runner, handlers, progress, RQ entrypoint
   orchestrator/ generation pipeline definition (stubs for now)
-  common/       allocation, seeds, storage, resolver, audio, dsp, synth, voice, vocalfx
+  common/       allocation, seeds, storage, resolver, audio, dsp, synth, voice, vocalfx, separation
 alembic/        migrations
 apps/web/       Next.js UI (band switcher, song workspace, Vocal Director)
 scripts/        setup / dev / worker / test / stage_gate

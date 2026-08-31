@@ -1,5 +1,34 @@
 # Changelog
 
+## [Stage 5] — Stem Separation + Song Editing — 2026-08-31
+
+Import a cover, replace the vocal, keep the melody.
+
+### Added
+- **`StemSeparationProvider`** contract `separate(source_path) -> StemSeparation`
+  (raw stereo stems). `CenterSplitStemProvider` (default — `sr/common/separation.py`,
+  soft-mask center-channel extraction: mid/side STFT → per-bin vocal mask,
+  `instrumental = mix - vocal`), `MockStemProvider`, `HttpStemProvider`
+  (`SR_STEM_HTTP_URL` → a Demucs-class service).
+- **`POST /songs/{id}/separate`** → `separate_stems` job → song-level
+  `stem_lead_vocal` + `stem_instrumental` as versioned `AudioAsset`s
+  (`parent_asset_id` = the upload; re-separate bumps `version`).
+  `GET /songs/{id}/stems`.
+- **`POST /songs/{id}/sections/{sid}/use-derived-stems`** — slices the separated
+  vocal → the section's `guide_vocal` and the instrumental → `instrumental_bed`,
+  so the existing Stage 3 conversion + Stage 2 mix take over.
+- **`assemble_song` job** (`sr/services/assembly.py`) — starts from the original
+  recording and splices in each rendered section (`vocal_bus` over the derived
+  instrumental, ~12 ms crossfades). Untouched time ranges are copied verbatim →
+  **byte-identical outside the replaced windows**. Versioned `song_mix` asset.
+  `POST /songs/{id}/assemble`, `GET /songs/{id}/mixes`.
+- `dsp.stft` / `dsp.istft` (public); `AssetType.SONG_MIX`.
+- **Web**: Cover Studio panel (Separate stems / Assemble full mix + stem players);
+  per-section "Use separated stems" button.
+- 6 new tests (98 total); `stage_gate.py 5`.
+
+---
+
 ## [Stage 4] — Vocal-Stack Quality — 2026-08-31
 
 Stacks now sound produced, not copied.
@@ -24,7 +53,7 @@ Stacks now sound produced, not copied.
 - **Web**: interval field per harmony/double singer; per-role fx chain editor;
   ensemble size/width inline; "Save section as preset" / "Apply preset";
   "Render A/B" with the width/correlation table and both masters.
-- 20 new tests (112 total); `stage_gate.py 4`.
+- 13 new tests (92 total); `stage_gate.py 4`.
 
 ### Fixed
 - `plan_role_takes` local `flat` list shadowed the new `flat` parameter — would

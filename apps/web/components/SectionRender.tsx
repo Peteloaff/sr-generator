@@ -145,6 +145,16 @@ export default function SectionRender({
     }
   };
 
+  const useSeparated = async () => {
+    setErr(null);
+    try {
+      await api.useDerivedStems(songId, sectionId);
+      load();
+    } catch (e) {
+      setErr(String(e));
+    }
+  };
+
   return (
     <div className="section-render">
       {err && <p className="danger">{err}</p>}
@@ -168,6 +178,9 @@ export default function SectionRender({
           accept="audio/*,.wav,.mp3,.flac,.m4a,.ogg"
           onChange={(e) => e.target.files?.[0] && uploadGuide(e.target.files[0])}
         />
+        <button onClick={useSeparated} title="slice this song's separated stems into this section">
+          Use separated stems
+        </button>
       </div>
 
       <h4>Source takes</h4>

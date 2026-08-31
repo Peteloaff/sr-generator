@@ -14,7 +14,7 @@ system install needed. ffprobe is not bundled — probing parses `ffmpeg -i`.
 |---|---|---|---|---|
 | music | `MusicGenerationProvider` | `SR_MUSIC_PROVIDER` | `mock` | Stage 7 |
 | voice | `VoiceProvider` | `SR_VOICE_PROVIDER` | **`local_dsp`** | Stage 3 ✅ + neural |
-| stem | `StemSeparationProvider` | `SR_STEM_PROVIDER` | `mock` | Stage 5 |
+| stem | `StemSeparationProvider` | `SR_STEM_PROVIDER` | **`center_split`** | Stage 5 ✅ + Demucs |
 | analysis | `AudioAnalysisProvider` | `SR_ANALYSIS_PROVIDER` | `mock` | Stage 1/6 |
 | mastering | `MasteringProvider` | `SR_MASTERING_PROVIDER` | `mock` | Stage 4/8 |
 | transcription | `TranscriptionProvider` | `SR_TRANSCRIPTION_PROVIDER` | `mock` | Stage 3/8 |
@@ -63,6 +63,20 @@ body, optional `X-Provider-Version` header). Then `SR_VOICE_PROVIDER=http`,
 
 Either way the app, the Vocal Director, caching, consent, and the layering engine
 are untouched — see `sr/providers/voice_http.py` for the wire format.
+
+## Stem separation providers (Stage 5)
+
+| name | what it is | needs |
+|---|---|---|
+| `center_split` (default) | mid/side soft-mask center-channel separation, pure NumPy | nothing |
+| `mock` | trivial centre split (tests) | nothing |
+| `http` | a Demucs/MDX-class service | `SR_STEM_HTTP_URL`, `httpx` |
+
+**Contract**: `separate(source_path: Path, params) -> StemSeparation(stems={...}, sample_rate)`.
+For `http`, the service takes `POST /separate` (multipart `audio`) and returns a
+zip of named WAV stems (`vocals.wav`, `drums.wav`, …). Set
+`SR_STEM_PROVIDER=http` + `SR_STEM_HTTP_URL`. The rest of the pipeline
+(use-derived-stems, render, assemble) is unchanged regardless of stem count.
 
 ## Research targets (not commitments)
 

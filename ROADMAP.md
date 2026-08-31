@@ -107,13 +107,24 @@ mode; no phase collapse; individual takes still exportable.
 
 ---
 
-## [ ] Stage 5 — Stem Separation + Song Editing
+## [x] Stage 5 — Stem Separation + Song Editing
 
-- [ ] `StemSeparationProvider`; import full mix → derive stems
-- [ ] replace/regenerate vocal layers; preserve original instrumental; versioned assets
+- [x] `StemSeparationProvider` — `CenterSplitStemProvider` (real, dependency-free
+      center-channel separation), `MockStemProvider`, `HttpStemProvider` (Demucs
+      service). Contract: `separate(source_path) -> StemSeparation`.
+- [x] `POST /songs/{id}/separate` → song-level `stem_lead_vocal` +
+      `stem_instrumental`, versioned (re-separate bumps the version)
+- [x] `POST /sections/{id}/use-derived-stems` — slices the separated stems into a
+      section's guide vocal + instrumental bed (feeds the Stage 3 conversion +
+      Stage 2 mix)
+- [x] `assemble_song` job — full-song mix = original recording with rendered
+      sections spliced in (short crossfades); **untouched ranges byte-identical**
+- [x] web: Cover Studio (separate / assemble) + per-section "Use separated stems"
 
 **Exit criteria** — import a demo, isolate practical stems, replace one vocal
 section, export a new mix without touching unrelated sections.
+**All PASS** (`python scripts/stage_gate.py 5`). This is the "replace vocals on a
+cover, keep the melody" workflow.
 
 ---
 

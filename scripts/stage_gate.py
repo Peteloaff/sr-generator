@@ -443,7 +443,93 @@ def stage4(client) -> list[Row]:
     return rows
 
 
-STAGES = {"0": stage0, "1": stage1, "2": stage2, "3": stage3, "4": stage4}
+def stage5(client) -> list[Row]:
+    import numpy as np
+    import soundfile as sf
+
+    rows: list[Row] = []
+    sr = 44100
+    t = np.linspace(0, 12, sr * 12, endpoint=False)
+    voc = np.zeros_like(t)
+    for i, f in enumerate([220, 247, 262, 294, 262, 247, 220, 196]):
+        seg = (t >= i * 1.5) & (t < (i + 1) * 1.5)
+        voc[seg] = 0.35 * np.sin(2 * np.pi * f * t[seg])
+    li = 0.25 * np.sin(2 * np.pi * 110 * t)
+    ri = 0.25 * np.sin(2 * np.pi * 110 * t + 0.5) + 0.15 * np.sin(2 * np.pi * 220 * t)
+    buf = io.BytesIO()
+    sf.write(buf, np.stack([voc + li, voc + ri], axis=1).astype("float32"), sr, format="WAV")
+    cover = buf.getvalue()
+
+    sid = client.post("/singers", json={"name": "Brian"}).json()["id"]
+    client.patch(f"/singers/{sid}", json={"consent_generation": True})
+    client.patch(f"/singers/{sid}/voice-model", json={"median_f0": 130.0})
+    song = client.post("/songs", json={"title": "Gate Cover", "seed": 5}).json()["id"]
+    client.post(f"/songs/{song}/audio", files={"file": ("c.wav", cover, "audio/wav")})
+    sec_a = client.post(
+        f"/songs/{song}/sections",
+        json={"section_type": "verse", "start_time": 0, "end_time": 4},
+    ).json()["id"]
+    client.post(
+        f"/songs/{song}/sections",
+        json={"section_type": "chorus", "start_time": 4, "end_time": 8},
+    )
+
+    def _win(a, s, e):
+        return a[int(s * sr) : int(e * sr)]
+
+    try:
+        j = client.post(f"/songs/{song}/separate").json()
+        j = client.post(f"/jobs/{j['id']}/wait", params={"timeout": 120}).json()
+        stems = client.get(f"/songs/{song}/stems").json()
+        ok = j["status"] == "succeeded" and {s["asset_type"] for s in stems} == {
+            "stem_lead_vocal", "stem_instrumental"
+        }
+        rows.append(("Separate a mix into vocal + instrumental stems", ok, f"{len(stems)} stems"))
+
+        d = client.post(f"/songs/{song}/sections/{sec_a}/use-derived-stems").json()
+        client.post(
+            f"/sections/{sec_a}/roles",
+            json={"role_type": "lead", "assignments": [{"singer_id": sid}]},
+        )
+        rj = client.post(f"/songs/{song}/sections/{sec_a}/render", json={}).json()
+        rj = client.post(f"/jobs/{rj['id']}/wait", params={"timeout": 120}).json()
+        rows.append(
+            ("Wire separated stems into a section + render",
+             {x["asset_type"] for x in d} == {"guide_vocal", "instrumental_bed"}
+             and rj["status"] == "succeeded", "guide + bed + render")
+        )
+
+        aj = client.post(f"/songs/{song}/assemble").json()
+        aj = client.post(f"/jobs/{aj['id']}/wait", params={"timeout": 120}).json()
+        mix = client.get(f"/songs/{song}/mixes").json()[0]
+        new_b = client.get(f"/songs/{song}/assets/{mix['id']}/download").content
+        tmp = Path(tempfile.mkdtemp()) / "a.wav"
+        tmp.write_bytes(new_b)
+        new, _ = sf.read(tmp)
+
+        from sr.common.storage import get_storage
+
+        orig_path = next(
+            p for p in get_storage().root.rglob("canonical.wav")
+            if f"{song}/canonical.wav" in str(p).replace("\\", "/")
+        )
+        orig, _ = sf.read(orig_path)
+
+        untouched = np.array_equal(_win(new, 5.0, 7.5), _win(orig, 5.0, 7.5))
+        replaced = not np.allclose(_win(new, 1.0, 3.0), _win(orig, 1.0, 3.0), atol=1e-4)
+        rows.append(("Assembled mix: replaced section differs", replaced, "section A"))
+        rows.append(
+            ("Assembled mix: untouched sections byte-identical", untouched, "section B window")
+        )
+    except Exception as exc:  # noqa: BLE001
+        rows.append(("Stem separation + assembly", False, repr(exc)))
+
+    return rows
+
+
+STAGES = {
+    "0": stage0, "1": stage1, "2": stage2, "3": stage3, "4": stage4, "5": stage5,
+}
 
 
 def main() -> int:

@@ -128,3 +128,24 @@ def rms_dbfs(x: np.ndarray) -> float:
         return -120.0
     rms = float(np.sqrt(np.mean(np.square(x, dtype=np.float64))))
     return 20.0 * float(np.log10(max(rms, _EPS)))
+
+
+def stft(x: np.ndarray, win: int = 2048, hop: int = 512) -> np.ndarray:
+    """Mono STFT -> (n_frames, n_bins) complex."""
+    w = np.hanning(win).astype(np.float32)
+    n = 1 + max(0, (len(x) - win) // hop)
+    if n <= 0:
+        return np.zeros((0, win // 2 + 1), dtype=complex)
+    return np.stack([np.fft.rfft(x[i * hop : i * hop + win] * w) for i in range(n)])
+
+
+def istft(frames: np.ndarray, length: int, win: int = 2048, hop: int = 512) -> np.ndarray:
+    w = np.hanning(win).astype(np.float32)
+    out = np.zeros(length + win, dtype=np.float32)
+    norm = np.zeros(length + win, dtype=np.float32)
+    for i, spec in enumerate(frames):
+        frame = np.fft.irfft(spec, n=win).astype(np.float32) * w
+        s = i * hop
+        out[s : s + win] += frame
+        norm[s : s + win] += w * w
+    return (out / np.maximum(norm, 1e-6))[:length]

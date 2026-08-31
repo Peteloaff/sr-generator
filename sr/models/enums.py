@@ -93,6 +93,7 @@ class AssetType(StrEnum):
     SECTION_RENDER = "section_render"
     MIX = "mix"
     MASTER = "master"
+    SONG_MIX = "song_mix"  # full-song assembly (original mix + replaced sections)
     PROJECT_STATE = "project_state"
     OTHER = "other"
 
