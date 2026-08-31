@@ -527,8 +527,74 @@ def stage5(client) -> list[Row]:
     return rows
 
 
+def stage6(client) -> list[Row]:
+    import numpy as np
+    import soundfile as sf
+
+    rows: list[Row] = []
+    cat = Path(tempfile.mkdtemp()) / "catalogue"
+    cat.mkdir()
+    sr = 44100
+    for name, bpm, notes, dur in (
+        ("song_a.wav", 120, (220.0, 261.63, 329.63), 26),
+        ("song_b.wav", 96, (261.63, 329.63, 392.0), 26),
+        ("too_short.wav", 120, (220.0, 261.63, 329.63), 8),
+    ):
+        t = np.arange(int(sr * dur)) / sr
+        chord = sum(0.12 * np.sin(2 * np.pi * f * t) for f in notes)
+        drum = np.zeros_like(t)
+        for b in np.arange(0, dur, 60 / bpm):
+            i = int(b * sr)
+            rng = np.random.default_rng(int(b * 7))
+            drum[i : i + 220] += np.exp(-np.linspace(0, 10, 220)) * rng.standard_normal(220) * 0.3
+        m = (chord + drum * 0.5).astype("float32")
+        sf.write(cat / name, np.stack([m, m * 0.9], axis=1), sr)
+
+    band = client.get("/bands").json()[0]["id"]
+    try:
+        j = client.post(
+            f"/bands/{band}/references/import-folder",
+            json={"path": str(cat), "recursive": False},
+        ).json()
+        j = client.post(f"/jobs/{j['id']}/wait", params={"timeout": 120}).json()
+        refs = client.get(f"/bands/{band}/references").json()
+        analysed = all(r["analysis_status"] == "ready" and r["bpm"] and r["key"] for r in refs)
+        rows.append(("Folder import + analyse every track", analysed and len(refs) == 3,
+                     f"{len(refs)} refs"))
+
+        short = next(r for r in refs if r["title"] == "too_short")
+        rows.append(("Poor-quality track is flagged, not accepted",
+                     short["quality_json"]["passed"] is False,
+                     str(short["quality_json"]["flags"])))
+
+        good = [r for r in refs if r["quality_json"]["passed"]]
+        for r in good:
+            client.patch(f"/references/{r['id']}", json={"approved_for_training": True})
+        m1 = client.get(f"/bands/{band}/training-manifest").json()
+        m2 = client.get(f"/bands/{band}/training-manifest").json()
+        rows.append(("Training manifest is reproducible",
+                     m1["dataset_version"] == m2["dataset_version"]
+                     and m1["totals"]["count"] == len(good), m1["dataset_version"]))
+
+        from sr.db import session_scope
+        from sr.models.band_reference import BandReference
+
+        with session_scope() as db:
+            db.query(BandReference).filter(
+                BandReference.id == good[0]["id"]
+            ).update({"bpm": None})
+        r = client.get(f"/bands/{band}/training-manifest")
+        rows.append(("Manifest refuses incomplete metadata", r.status_code == 409,
+                     str(r.status_code)))
+    except Exception as exc:  # noqa: BLE001
+        rows.append(("Band DNA + manifest", False, repr(exc)))
+
+    return rows
+
+
 STAGES = {
-    "0": stage0, "1": stage1, "2": stage2, "3": stage3, "4": stage4, "5": stage5,
+    "0": stage0, "1": stage1, "2": stage2, "3": stage3, "4": stage4,
+    "5": stage5, "6": stage6,
 }
 
 

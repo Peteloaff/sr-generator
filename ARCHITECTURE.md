@@ -120,6 +120,32 @@ on read: the 100%-scaled split (`normalize_weights`) and — for ensemble roles
 `largest_remainder_allocation`. Lead/double are always one take. The UI shows
 `Brian 70 → 7 takes` without ever mutating the stored weights.
 
+## Band DNA (Stage 6)
+
+Dataset prep for a band-specific model — no training here.
+
+```
+POST /bands/{id}/references/import-folder {path}   -> import_folder job
+  scan the folder (recursive), one BandReference per audio file
+  dedup on sha256(content)[:32]  (unique per band)
+  analyse each: AudioAnalysisProvider.analyze(canonical) -> bpm/key/tuning/
+                structure/energy/embedding  +  quality.check_file() -> flags/score
+
+PATCH /references/{id} {approved_for_training: true}   (blocked until analysed)
+
+GET /bands/{id}/training-manifest
+  approved refs must all have bpm+key+tuning+duration+ready analysis  -> else 409
+  dataset_version = sha256(manifest_version | band_slug | sorted[(hash, analysis_version)])
+  (deterministic - same catalogue -> same manifest)
+POST /bands/{id}/training-manifest  -> models/band/{id}/manifest_vN.json
+
+GET /bands/{id}/dna  -> BPM/key/tuning distributions, tag cloud, mean embedding,
+                        mean energy profile, structure style
+```
+
+`LocalMirAnalysisProvider` is approximate NumPy MIR; a real stack (librosa /
+Essentia / a model) registers as `SR_ANALYSIS_PROVIDER`.
+
 ## Stem separation + song editing (Stage 5)
 
 The "replace a cover's vocal, keep the melody" path — it reuses everything above.

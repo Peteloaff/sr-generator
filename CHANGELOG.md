@@ -1,5 +1,37 @@
 # Changelog
 
+## [Stage 6] — Band DNA Analysis — 2026-08-31
+
+Point at a folder → a structured, quality-checked catalogue → a reproducible
+training manifest. No fine-tuning yet.
+
+### Added
+- **Folder import**: `POST /bands/{id}/references/import-folder` `{path, recursive,
+  auto_approve}` → `import_folder` job that ingests every audio file as a
+  `BandReference` (content-hash dedup), then analyses each. Plus
+  `scripts/import_catalogue.py`. Single upload: `POST /bands/{id}/references`.
+- **`LocalMirAnalysisProvider`** (`sr/common/analysis.py`, NumPy): BPM (onset
+  autocorrelation), key (chroma → Krumhansl), tuning (pitch-peak deviation from
+  A=440), energy curve, loudness, section structure (novelty on frame features),
+  a 34-d spectral embedding. `MockAnalysisProvider`, `HttpAnalysisProvider`
+  (`SR_ANALYSIS_HTTP_URL`). `dsp.stft`/`istft` reused.
+- `BandReference` gains `duration`, `sample_rate`, `channels`, `content_hash`
+  (unique per band), `source_kind`, `quality_json`, `analysis_status/provider/version`.
+- **`sr/services/quality.py`** — clipping / silence / too-short / near-mono /
+  low-loudness flags → score + pass/fail. `PATCH /references/{id}` refuses
+  `approved_for_training` until `analysis_status == "ready"`.
+- **Training manifest** (`sr/services/manifest.py`): `GET /bands/{id}/training-manifest`
+  — every approved reference must have `bpm`/`key`/`tuning`/`duration` + ready
+  analysis, else **409** with the incomplete list. `dataset_version` = deterministic
+  hash of the included set. `POST` snapshots to `models/band/{id}/manifest_vN.json`.
+  `GET .../completeness`.
+- **`GET /bands/{id}/dna`** (`sr/services/dna.py`) — BPM/key/tuning distributions,
+  tag cloud, mean embedding, mean energy profile, structure style.
+- **Web**: `/references` Band DNA page.
+- 14 new tests (107 total); `stage_gate.py 6`.
+
+---
+
 ## [Stage 5] — Stem Separation + Song Editing — 2026-08-31
 
 Import a cover, replace the vocal, keep the melody.

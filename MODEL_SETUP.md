@@ -15,7 +15,7 @@ system install needed. ffprobe is not bundled — probing parses `ffmpeg -i`.
 | music | `MusicGenerationProvider` | `SR_MUSIC_PROVIDER` | `mock` | Stage 7 |
 | voice | `VoiceProvider` | `SR_VOICE_PROVIDER` | **`local_dsp`** | Stage 3 ✅ + neural |
 | stem | `StemSeparationProvider` | `SR_STEM_PROVIDER` | **`center_split`** | Stage 5 ✅ + Demucs |
-| analysis | `AudioAnalysisProvider` | `SR_ANALYSIS_PROVIDER` | `mock` | Stage 1/6 |
+| analysis | `AudioAnalysisProvider` | `SR_ANALYSIS_PROVIDER` | **`local_mir`** | Stage 6 ✅ + librosa/model |
 | mastering | `MasteringProvider` | `SR_MASTERING_PROVIDER` | `mock` | Stage 4/8 |
 | transcription | `TranscriptionProvider` | `SR_TRANSCRIPTION_PROVIDER` | `mock` | Stage 3/8 |
 

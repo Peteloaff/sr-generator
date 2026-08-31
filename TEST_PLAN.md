@@ -3,6 +3,13 @@
 `scripts/test.ps1` runs ruff + pytest. `scripts/stage_gate.py <N>` checks a
 stage's exit criteria and prints PASS/FAIL.
 
+## Stage 6 — automated (107 tests total, all passing)
+
+| Area | File | Covers |
+|---|---|---|
+| Analysis DSP | `tests/test_analysis.py` | BPM within ±6 of ground truth (120 / 96); **key detects A minor** (conf > 0.7); analyse bundle complete (8 keys, 64-pt energy, 34-d embedding) + deterministic; ET audio → tuning ~0 cents |
+| Band DNA | `tests/test_stage6.py` | **folder import analyses every track**; content-hash dedup (re-import creates 0); poor-quality track flagged (`passed=false`, "too short"); **manifest reproducible** + **409 when an approved ref is missing metadata**; can't approve before analysis; `/dna` aggregates the catalogue |
+
 ## Stage 5 — automated (98 tests total, all passing)
 
 | Area | File | Covers |

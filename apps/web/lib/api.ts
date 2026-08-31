@@ -94,6 +94,14 @@ export interface VocalPreset {
   id: string; band_id: string; name: string; description: string | null;
   spec_json: { roles: unknown[] };
 }
+export interface BandReference {
+  id: string; band_id: string; title: string; source_file: string | null;
+  source_kind: string; duration: number | null; bpm: number | null; key: string | null;
+  tuning: string | null; tags: string[] | null;
+  quality_json: { score: number; passed: boolean; flags: string[] } | null;
+  analysis_status: string; analysis_provider: string | null;
+  approved_for_training: boolean;
+}
 export interface ABResult {
   seed: number; ensemble_job_id: string; flat_job_id: string;
   ensemble: Record<string, number | string>; flat: Record<string, number | string>;
@@ -207,6 +215,33 @@ export const api = {
       method: "POST",
       body: JSON.stringify({}),
     }),
+
+  listReferences: (bandId: string) => req<BandReference[]>(`/bands/${bandId}/references`),
+  uploadReference: (bandId: string, file: File) =>
+    upload<BandReference>(`/bands/${bandId}/references`, file),
+  importFolder: (bandId: string, body: { path: string; recursive: boolean; auto_approve: boolean }) =>
+    req<Job>(`/bands/${bandId}/references/import-folder`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  analyzeBand: (bandId: string) =>
+    req<Job>(`/bands/${bandId}/references/analyze`, { method: "POST" }),
+  updateReference: (id: string, patch: Partial<BandReference>) =>
+    req<BandReference>(`/references/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
+  analyzeReference: (id: string) =>
+    req<BandReference>(`/references/${id}/analyze`, { method: "POST" }),
+  deleteReference: (id: string) => req<void>(`/references/${id}`, { method: "DELETE" }),
+  bandDna: (bandId: string) => req<Record<string, unknown>>(`/bands/${bandId}/dna`),
+  trainingManifest: (bandId: string) =>
+    fetch(`${API_BASE}/bands/${bandId}/training-manifest`, {
+      headers: { "X-Band-Id": bandId },
+      cache: "no-store",
+    }).then(async (r) => ({ status: r.status, body: await r.json() })),
+  snapshotManifest: (bandId: string) =>
+    req<{ dataset_version: string; snapshot_version: number; path: string; count: number }>(
+      `/bands/${bandId}/training-manifest`,
+      { method: "POST" },
+    ),
 
   separateStems: (songId: string) =>
     req<Job>(`/songs/${songId}/separate`, { method: "POST" }),

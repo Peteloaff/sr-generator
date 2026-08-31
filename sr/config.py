@@ -30,7 +30,8 @@ class Settings(BaseSettings):
     voice_http_url: str = ""
     stem_provider: str = "center_split"
     stem_http_url: str = ""
-    analysis_provider: str = "mock"
+    analysis_provider: str = "local_mir"
+    analysis_http_url: str = ""
     mastering_provider: str = "mock"
     transcription_provider: str = "mock"
 

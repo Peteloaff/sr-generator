@@ -49,6 +49,15 @@ class StemSeparation:
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
+@dataclass
+class AudioAnalysis:
+    """Structured analysis of a reference song (bpm, key, tuning, structure, ...)."""
+
+    analysis: dict[str, Any]
+    provider: str
+    provider_version: str
+
+
 class BaseProvider(abc.ABC):
     name: str = "base"
     version: str = "0.0.0"
@@ -100,8 +109,12 @@ class StemSeparationProvider(BaseProvider):
 
 
 class AudioAnalysisProvider(BaseProvider):
+    """Detects BPM, key, tuning, structure, energy, embeddings for the Band DNA
+    catalogue. A real MIR stack (librosa, Essentia, a model) implements this."""
+
     @abc.abstractmethod
-    def analyze(self, *, source_asset: str) -> ProviderResult: ...
+    def analyze(self, *, source_path: Path) -> AudioAnalysis:
+        """Analyse the audio at ``source_path``."""
 
 
 class MasteringProvider(BaseProvider):

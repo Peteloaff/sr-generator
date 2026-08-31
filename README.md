@@ -6,11 +6,11 @@ deterministic, section- and line-level control over *which authorized singer
 performs each vocal part*, with weighted ensembles, harmonies, doubles, gang
 vocals, and screams.
 
-> **Status: Stage 5 (Stem Separation + Song Editing) complete.** Import a cover,
-> separate the vocal from the instrumental, replace the vocal with your singers,
-> and assemble a new mix — untouched sections stay byte-identical. Stages 1–4
-> (workspace, layering, voice conversion, stack quality) underneath. No music
-> model yet. See [ROADMAP.md](ROADMAP.md).
+> **Status: Stage 6 (Band DNA Analysis) complete.** Point at a folder of your
+> catalogue → every track is analysed (BPM / key / tuning / structure), quality-
+> checked, and rolled into a reproducible training manifest. Stages 1–5
+> (workspace, layering, voice conversion, stack quality, stem separation)
+> underneath. No music model yet. See [ROADMAP.md](ROADMAP.md).
 
 ## What you can do today
 
@@ -31,6 +31,11 @@ vocals, and screams.
   **Use separated stems** (the separated vocal becomes the guide, the
   instrumental the bed), render with your singers, then **Assemble full mix** —
   the sections you didn't touch come out exactly as they were recorded.
+- **Build the Band DNA**: point at a folder of your catalogue
+  (`scripts/import_catalogue.py "D:/music/my band"` or the Band DNA page) — every
+  track is analysed (BPM / key / tuning / structure / energy), quality-checked,
+  and, once approved, rolled into a **reproducible training manifest** (refuses
+  incomplete metadata).
 - **Give each singer a voice**: upload training samples and run the analysis, or
   set the profile by hand (pitch / formant / brightness / breathiness /
   roughness). Training and generation are blocked until you grant consent.
@@ -84,11 +89,11 @@ sr/
   api/          FastAPI app + routers (bands, singers, voice_models, songs, vocal, render, jobs)
   models/       SQLAlchemy ORM (the core data model)
   schemas/      Pydantic request/response models
-  services/     normalization, layering, render, consent, cache, presets, separation, assembly, project i/o
-  providers/    ABCs + mock + local/http voice + stem providers + registry
+  services/     layering, render, consent, cache, presets, separation, assembly, references, manifest, dna, quality
+  providers/    ABCs + mock + local/http voice / stem / analysis providers + registry
   worker/       job queue backends, runner, handlers, progress, RQ entrypoint
   orchestrator/ generation pipeline definition (stubs for now)
-  common/       allocation, seeds, storage, resolver, audio, dsp, synth, voice, vocalfx, separation
+  common/       allocation, seeds, storage, resolver, audio, dsp, synth, voice, vocalfx, separation, analysis
 alembic/        migrations
 apps/web/       Next.js UI (band switcher, song workspace, Vocal Director)
 scripts/        setup / dev / worker / test / stage_gate

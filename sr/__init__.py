@@ -1,9 +1,9 @@
 """SR Generator - private AI band music workstation.
 
-Stage 5: stem separation + song editing. Import a cover, separate the vocal from
-the instrumental (center-channel DSP; a Demucs-class model plugs into the same
-contract), wire the derived stems into a section, render it with band singers,
-and assemble a full mix - untouched sections stay byte-identical. See ROADMAP.md.
+Stage 6: Band DNA analysis. Point at a folder; every catalogue track becomes a
+reference and is analysed (BPM / key / tuning / structure / energy / embedding).
+Quality checks gate approval; a reproducible training manifest refuses incomplete
+metadata. No fine-tuning yet - this is dataset prep. See ROADMAP.md.
 """
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"

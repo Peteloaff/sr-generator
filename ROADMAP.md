@@ -128,13 +128,23 @@ cover, keep the melody" workflow.
 
 ---
 
-## [ ] Stage 6 — Band DNA Analysis
+## [x] Stage 6 — Band DNA Analysis
 
-- [ ] reference library; BPM/key/structure/tuning metadata; tags; embeddings
-- [ ] dataset approval flags; quality checks; training-manifest generator
+- [x] reference library + **folder import** (`POST /bands/{id}/references/import-folder`,
+      `scripts/import_catalogue.py`) — content-hash dedup, one job per catalogue
+- [x] `LocalMirAnalysisProvider` (NumPy): BPM, key, tuning, energy curve,
+      loudness, section structure, spectral embedding. `HttpAnalysisProvider` stub.
+- [x] `sr/services/quality.py` — clipping / silence / too-short / mono / low-loudness
+      flags → score + pass/fail; can't approve until analysed
+- [x] `dataset_version` — deterministic hash of the approved set + analysis
+      versions; `GET /bands/{id}/training-manifest` refuses (409) incomplete
+      metadata; `POST` snapshots to `models/band/{id}/manifest_vN.json`
+- [x] `GET /bands/{id}/dna` — BPM/key/tuning distributions, tag cloud, mean
+      embedding, energy profile
+- [x] web: Band DNA page (folder import, list, approve, DNA card, manifest)
 
 **Exit criteria** — every approved training song has complete metadata and a
-reproducible dataset manifest.
+reproducible dataset manifest. **All PASS** (`python scripts/stage_gate.py 6`).
 
 ---
 

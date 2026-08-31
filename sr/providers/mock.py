@@ -17,6 +17,7 @@ import numpy as np
 from sr.common.seeds import bounded_jitter, derive_seed
 from sr.common.storage import get_storage
 from sr.providers.base import (
+    AudioAnalysis,
     AudioAnalysisProvider,
     MasteringProvider,
     MusicGenerationProvider,
@@ -122,17 +123,21 @@ class MockAnalysisProvider(AudioAnalysisProvider):
     name = "mock"
     version = "mock-analysis-0.1.0"
 
-    def analyze(self, *, source_asset: str) -> ProviderResult:
-        s = derive_seed(1, source_asset)
-        return self._result(
-            metadata={
+    def analyze(self, *, source_path: Path) -> AudioAnalysis:
+        s = derive_seed(1, str(source_path))
+        return AudioAnalysis(
+            analysis={
                 "bpm": round(bounded_jitter(s, 90, 180), 1),
-                "key": ["C", "D", "E", "F", "G", "A", "B"][s % 7],
+                "key": {"key": ["C major", "A minor", "E minor", "G major"][s % 4]},
+                "tuning": {"label": "A=440 (standard)", "cents": 0.0},
+                "loudness_dbfs": round(bounded_jitter(s ^ 7, -16, -6), 1),
+                "energy_curve": [round(bounded_jitter(s ^ i, 0.2, 1.0), 3) for i in range(16)],
+                "structure": {"count": 3, "unique": ["A", "B"]},
+                "embedding": [0.0] * 8,
                 "duration": round(bounded_jitter(s ^ 3, 120, 240), 1),
-                "loudness_lufs": round(bounded_jitter(s ^ 7, -16, -6), 1),
-                "sections": ["intro", "verse", "chorus", "verse", "chorus", "bridge", "chorus"],
             },
-            logs=[f"mock analysis of {source_asset}"],
+            provider=self.name,
+            provider_version=self.version,
         )
 
 

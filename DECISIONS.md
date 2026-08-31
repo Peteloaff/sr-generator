@@ -312,3 +312,41 @@ unchanged.
 **Consequences.** "Unrelated sections untouched" is literally true and testable
 (`np.array_equal` on a window). The replaced windows use the *separated*
 instrumental (so the old vocal is gone there) plus the new band vocal.
+
+---
+
+## ADR-0020 — Folder import is the catalogue path, not one-by-one upload
+
+**Context.** A band catalogue is dozens to hundreds of files. Uploading each
+through the browser is untenable, and this is a local-first app on the user's
+own machine.
+
+**Decision.** `POST /bands/{id}/references/import-folder {path, recursive}` scans
+a local directory server-side, ingests every audio file (content-hash dedup),
+and analyses each - one job for the whole catalogue, resumable (re-running skips
+duplicates). `scripts/import_catalogue.py` does the same in-process. Single-file
+upload remains for one-offs.
+
+**Consequences.** "Point at a folder" just works. The importer reads from the
+server's filesystem, so for a remote deployment the catalogue must be mounted
+where the API runs (fine for local-first; documented).
+
+---
+
+## ADR-0021 — Reproducible `dataset_version`, hard gate on completeness
+
+**Context.** Blueprint exit criterion: "every approved training song has complete
+metadata and a reproducible dataset manifest."
+
+**Decision.** `build_manifest` collects only `approved_for_training` references,
+and every one must have `bpm`, `key`, `tuning`, `duration`, and
+`analysis_status == "ready"` - otherwise the endpoint returns **409** with the
+exact missing fields per song. `dataset_version` is
+`sha256(manifest_version | band_slug | sorted[(content_hash, analysis_version)])`
+- no timestamps, so the same catalogue always yields the same version. The
+snapshot file adds `snapshot_at` separately (metadata, not part of the identity).
+
+**Consequences.** You cannot accidentally train on a half-analysed dataset. Two
+people with the same approved catalogue get byte-identical manifests. Re-running
+analysis with a new provider version changes `dataset_version` (correct - it's a
+different dataset).

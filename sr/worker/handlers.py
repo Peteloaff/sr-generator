@@ -42,8 +42,37 @@ def _mock_generation(job: GenerationJob, db: Session) -> base.ProviderResult:
 
 
 def _analyze_reference(job: GenerationJob, db: Session) -> base.ProviderResult:
-    params = job.parameters_json or {}
-    return get_provider("analysis").analyze(source_asset=str(params.get("source_asset", "")))
+    from sr.providers.registry import get_provider as _gp
+    from sr.services.references import analyze_band_job
+
+    if not job.parameters_json or not job.parameters_json.get("band_id"):
+        raise ValueError("analyze_reference job requires band_id")
+    summary = analyze_band_job(
+        db, job, band_id=job.parameters_json["band_id"], params=job.parameters_json
+    )
+    prov = _gp("analysis")
+    return base.ProviderResult(
+        provider=prov.name, provider_version=prov.version, outputs=[],
+        metadata=summary, logs=[f"analysed {len(summary['analyzed'])} reference(s)"],
+    )
+
+
+def _import_folder(job: GenerationJob, db: Session) -> base.ProviderResult:
+    from sr.services.references import import_folder
+
+    if not job.parameters_json or not job.parameters_json.get("band_id"):
+        raise ValueError("import_folder job requires band_id + path")
+    summary = import_folder(
+        db, job, band_id=job.parameters_json["band_id"], params=job.parameters_json
+    )
+    note = (
+        f"imported {summary['created']} / {summary['scanned']} "
+        f"({summary['skipped_duplicates']} dup, {summary['failed']} failed)"
+    )
+    return base.ProviderResult(
+        provider="catalogue-import", provider_version="import-0.6.0", outputs=[],
+        metadata=summary, logs=[note],
+    )
 
 
 def _separate_stems(job: GenerationJob, db: Session) -> base.ProviderResult:
@@ -122,6 +151,7 @@ def _render_section(job: GenerationJob, db: Session) -> base.ProviderResult:
 _HANDLERS: dict[str, Handler] = {
     "mock_generation": _mock_generation,
     "analyze_reference": _analyze_reference,
+    "import_folder": _import_folder,
     "separate_stems": _separate_stems,
     "assemble_song": _assemble_song,
     "train_singer": _train_singer,

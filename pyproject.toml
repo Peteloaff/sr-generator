@@ -1,7 +1,7 @@
 [project]
 name = "sr-generator"
-version = "0.5.0"
-description = "SR Generator - private AI band music workstation (Stage 5: stem separation + song editing)"
+version = "0.6.0"
+description = "SR Generator - private AI band music workstation (Stage 6: band DNA analysis)"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",

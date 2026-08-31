@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from sr.config import get_settings
 from sr.providers import base, mock
+from sr.providers.analysis_http import HttpAnalysisProvider
+from sr.providers.analysis_local import LocalMirAnalysisProvider
 from sr.providers.stem_http import HttpStemProvider
 from sr.providers.stem_local import CenterSplitStemProvider
 from sr.providers.voice_http import HttpVoiceProvider
@@ -22,6 +24,8 @@ _REGISTRY: dict[tuple[str, str], type[base.BaseProvider]] = {
     ("stem", "center_split"): CenterSplitStemProvider,
     ("stem", "http"): HttpStemProvider,
     ("analysis", "mock"): mock.MockAnalysisProvider,
+    ("analysis", "local_mir"): LocalMirAnalysisProvider,
+    ("analysis", "http"): HttpAnalysisProvider,
     ("mastering", "mock"): mock.MockMasteringProvider,
     ("transcription", "mock"): mock.MockTranscriptionProvider,
 }
