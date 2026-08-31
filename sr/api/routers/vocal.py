@@ -67,6 +67,7 @@ def _create_role(
         humanize_pitch_cents=payload.humanize_pitch_cents,
         humanize_formant=payload.humanize_formant,
         notes=payload.notes,
+        processing_json=payload.processing,
         **parent,
     )
     for a in payload.assignments:
@@ -135,7 +136,8 @@ def update_role(
 ) -> VocalRole:
     role = _role(db, role_id)
     for field, value in payload.model_dump(exclude_unset=True).items():
-        setattr(role, field, value.value if hasattr(value, "value") else value)
+        col = "processing_json" if field == "processing" else field
+        setattr(role, col, value.value if hasattr(value, "value") else value)
     db.commit()
     db.refresh(role)
     return role

@@ -91,13 +91,19 @@ provider — see TEST_PLAN.md.
 
 ---
 
-## [ ] Stage 4 — Harmony / Double / Gang Vocal Quality
+## [x] Stage 4 — Harmony / Double / Gang Vocal Quality
 
-- [ ] multi-take generation; humanization; harmony intervals; octave doubles
-- [ ] stereo distribution; de-ess/EQ/compression hooks; vocal presets
+- [x] multi-take generation + humanization (Stage 2) + `VocalAssignment.interval_semitones`
+      for harmony intervals and octave doubles
+- [x] per-role processing chain (`sr/common/vocalfx.py`): de-esser, FFT EQ,
+      compressor; stack-gain compensation (`1/√n`)
+- [x] `VocalPreset` — save a section's stack, apply to any section (singers by name)
+- [x] `render` `mode: ensemble | flat`; `POST /sections/{id}/ab` renders both and
+      compares width / L-R correlation / mono-compatibility
 
 **Exit criteria** — A/B shows a clear difference between a gain mix and ensemble
 mode; no phase collapse; individual takes still exportable.
+**All PASS** (`python scripts/stage_gate.py 4`).
 
 ---
 

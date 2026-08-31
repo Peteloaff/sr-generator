@@ -1,5 +1,37 @@
 # Changelog
 
+## [Stage 4] — Vocal-Stack Quality — 2026-08-31
+
+Stacks now sound produced, not copied.
+
+### Added
+- **Harmony intervals**: `VocalAssignment.interval_semitones` — a harmony singer
+  at `+3`/`+7`, an octave double at `-12`. Layered into the take pitch alongside
+  detune + jitter; kept even in `flat` mode (it's arrangement, not production).
+- **`sr/common/vocalfx.py`**: de-esser (dynamic HF duck), full-signal FFT EQ
+  (two shelves + presence bell), soft-knee compressor, `stack_gain(n)=1/√n`
+  compensation, and A/B metrics (`stereo_correlation`, `width_ratio`,
+  `mono_compat`). A per-role chain lives in `VocalRole.processing_json` and runs
+  on the summed role stem.
+- **`VocalPreset`** (band-scoped): capture a section's roles (singers by name +
+  weight + interval + mix + processing), apply to any section.
+  `POST/GET/DELETE /vocal-presets`, `POST /vocal-presets/{id}/apply`.
+- **A/B render**: `RenderRequest.mode` (`ensemble` default / `flat`).
+  `POST /songs/{id}/sections/{sid}/ab` renders both and returns a verdict —
+  ensemble measurably wider, less L-R correlated, no phase collapse.
+- `GenerationJob.result_json` persists a job's result metadata (incl. A/B
+  numbers).
+- **Web**: interval field per harmony/double singer; per-role fx chain editor;
+  ensemble size/width inline; "Save section as preset" / "Apply preset";
+  "Render A/B" with the width/correlation table and both masters.
+- 20 new tests (112 total); `stage_gate.py 4`.
+
+### Fixed
+- `plan_role_takes` local `flat` list shadowed the new `flat` parameter — would
+  have disabled all humanisation. Renamed to `take_order`.
+
+---
+
 ## [Stage 3] — Singing Voice Provider — 2026-08-31
 
 A guide vocal is now converted into each singer's voice. The conversion is real

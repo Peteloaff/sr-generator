@@ -32,6 +32,7 @@ class GenerationJob(UUIDPrimaryKey, Timestamps, Base):
 
     seed: Mapped[int | None] = mapped_column(Integer, default=None)
     parameters_json: Mapped[dict | None] = mapped_column(JSON, default=None)
+    result_json: Mapped[dict | None] = mapped_column(JSON, default=None)
     input_asset_ids: Mapped[list | None] = mapped_column(JSON, default=None)
     logs: Mapped[str | None] = mapped_column(Text, default=None)
     error: Mapped[str | None] = mapped_column(Text, default=None)

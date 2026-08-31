@@ -81,11 +81,23 @@ export interface LyricLine {
 }
 export interface Assignment {
   id: string; vocal_role_id: string; singer_id: string; weight_percent: number;
-  gain_db: number; pan: number; pitch_offset_semitones: number; style: string | null;
+  gain_db: number; pan: number; interval_semitones: number;
+  pitch_offset_semitones: number; style: string | null;
 }
+export type FxStep = { type: string } & Record<string, number | string>;
 export interface VocalRole {
   id: string; section_id: string | null; lyric_line_id: string | null; role_type: string;
-  ensemble_size: number; width: number; notes: string | null; assignments: Assignment[];
+  ensemble_size: number; width: number; notes: string | null;
+  processing_json: FxStep[] | null; assignments: Assignment[];
+}
+export interface VocalPreset {
+  id: string; band_id: string; name: string; description: string | null;
+  spec_json: { roles: unknown[] };
+}
+export interface ABResult {
+  seed: number; ensemble_job_id: string; flat_job_id: string;
+  ensemble: Record<string, number | string>; flat: Record<string, number | string>;
+  verdict: Record<string, boolean | number>;
 }
 export interface NormalizedShare {
   singer_id: string; weight_percent: number; normalized_percent: number; ensemble_takes: number;
@@ -160,10 +172,12 @@ export const api = {
 
   sectionRoles: (sectionId: string) => req<VocalRole[]>(`/sections/${sectionId}/roles`),
   lineRoles: (lineId: string) => req<VocalRole[]>(`/lines/${lineId}/roles`),
-  createSectionRole: (sectionId: string, body: Partial<VocalRole>) =>
+  createSectionRole: (sectionId: string, body: Record<string, unknown>) =>
     req<VocalRole>(`/sections/${sectionId}/roles`, { method: "POST", body: JSON.stringify(body) }),
-  createLineRole: (lineId: string, body: Partial<VocalRole>) =>
+  createLineRole: (lineId: string, body: Record<string, unknown>) =>
     req<VocalRole>(`/lines/${lineId}/roles`, { method: "POST", body: JSON.stringify(body) }),
+  updateRole: (id: string, patch: Record<string, unknown>) =>
+    req<VocalRole>(`/roles/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
   deleteRole: (id: string) => req<void>(`/roles/${id}`, { method: "DELETE" }),
   normalized: (roleId: string) => req<NormalizedShare[]>(`/roles/${roleId}/normalized`),
   addAssignment: (roleId: string, singer_id: string, weight_percent: number) =>
@@ -174,6 +188,24 @@ export const api = {
   updateAssignment: (id: string, patch: Partial<Assignment>) =>
     req<Assignment>(`/assignments/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
   deleteAssignment: (id: string) => req<void>(`/assignments/${id}`, { method: "DELETE" }),
+
+  listPresets: () => req<VocalPreset[]>("/vocal-presets"),
+  savePresetFromSection: (name: string, from_section_id: string) =>
+    req<VocalPreset>("/vocal-presets", {
+      method: "POST",
+      body: JSON.stringify({ name, from_section_id }),
+    }),
+  applyPreset: (presetId: string, section_id: string) =>
+    req<{ created_roles: VocalRole[]; skipped_singers: string[] }>(
+      `/vocal-presets/${presetId}/apply`,
+      { method: "POST", body: JSON.stringify({ section_id }) },
+    ),
+  deletePreset: (id: string) => req<void>(`/vocal-presets/${id}`, { method: "DELETE" }),
+  renderAB: (songId: string, sectionId: string) =>
+    req<ABResult>(`/songs/${songId}/sections/${sectionId}/ab`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    }),
 
   getVoiceModel: (singerId: string) => req<VoiceModel>(`/singers/${singerId}/voice-model`),
   setVoiceProfile: (singerId: string, patch: VoiceProfile) =>
@@ -200,7 +232,11 @@ export const api = {
     }),
   uploadInstrumental: (songId: string, sectionId: string, file: File) =>
     upload<AudioAsset>(`/songs/${songId}/sections/${sectionId}/instrumental`, file),
-  renderSection: (songId: string, sectionId: string, body: { seed?: number | null } = {}) =>
+  renderSection: (
+    songId: string,
+    sectionId: string,
+    body: { seed?: number | null; mode?: "ensemble" | "flat" } = {},
+  ) =>
     req<Job>(`/songs/${songId}/sections/${sectionId}/render`, {
       method: "POST",
       body: JSON.stringify(body),

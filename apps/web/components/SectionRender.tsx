@@ -4,10 +4,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   api,
   assetUrl,
+  type ABResult,
   type AudioAsset,
   type Job,
   type RenderTake,
   type Singer,
+  type VocalPreset,
   type VocalRole,
 } from "@/lib/api";
 
@@ -36,6 +38,8 @@ export default function SectionRender({
   const [takeRows, setTakeRows] = useState<RenderTake[]>([]);
   const [roles, setRoles] = useState<VocalRole[]>([]);
   const [guide, setGuide] = useState<AudioAsset | null>(null);
+  const [presets, setPresets] = useState<VocalPreset[]>([]);
+  const [ab, setAb] = useState<ABResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -47,15 +51,17 @@ export default function SectionRender({
     .filter((s): s is Singer => !!s);
 
   const load = useCallback(async () => {
-    const [t, r, rl, sa] = await Promise.all([
+    const [t, r, rl, sa, pr] = await Promise.all([
       api.listSourceTakes(songId, sectionId),
       api.listSectionRenders(songId, sectionId),
       api.sectionRoles(sectionId),
       api.listAssets(songId),
+      api.listPresets(),
     ]);
     setTakes(t);
     setRenders(r);
     setRoles(rl);
+    setPresets(pr);
     setGuide(
       sa.find((a) => a.asset_type === "guide_vocal" && a.section_id === sectionId) ?? null,
     );
@@ -88,6 +94,40 @@ export default function SectionRender({
       setErr(String(e));
     } finally {
       setBusy(false);
+    }
+  };
+
+  const runAB = async () => {
+    setBusy(true);
+    setErr(null);
+    try {
+      setAb(await api.renderAB(songId, sectionId));
+      await load();
+    } catch (e) {
+      setErr(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const savePreset = async () => {
+    const name = window.prompt("Preset name (e.g. 'Big Chorus')");
+    if (!name) return;
+    try {
+      await api.savePresetFromSection(name, sectionId);
+      load();
+    } catch (e) {
+      setErr(String(e));
+    }
+  };
+
+  const applyPreset = async (presetId: string) => {
+    try {
+      const res = await api.applyPreset(presetId, sectionId);
+      if (res.skipped_singers.length) setErr(`skipped: ${res.skipped_singers.join(", ")}`);
+      load();
+    } catch (e) {
+      setErr(String(e));
     }
   };
 
@@ -160,9 +200,25 @@ export default function SectionRender({
         </tbody>
       </table>
 
+      <h4>Presets</h4>
+      <div className="row">
+        <button onClick={savePreset}>Save section as preset</button>
+        <select value="" onChange={(e) => e.target.value && applyPreset(e.target.value)}>
+          <option value="">Apply preset…</option>
+          {presets.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <div className="row">
         <button onClick={render} disabled={busy}>
-          {busy ? "rendering…" : "Render section"}
+          {busy ? "working…" : "Render section"}
+        </button>
+        <button onClick={runAB} disabled={busy} title="ensemble vs naive gain stack">
+          Render A/B
         </button>
         {latest && (
           <span className="muted">
@@ -171,6 +227,53 @@ export default function SectionRender({
           </span>
         )}
       </div>
+
+      {ab && (
+        <div className="ab">
+          <strong>
+            A/B — ensemble is{" "}
+            {ab.verdict.ensemble_clearly_different ? "clearly different" : "NOT clearly different"}
+          </strong>
+          <table>
+            <thead>
+              <tr>
+                <th></th>
+                <th>width</th>
+                <th>L/R correlation</th>
+                <th>mono-compat</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {([
+                ["flat gain stack", ab.flat, ab.flat_job_id],
+                ["ensemble", ab.ensemble, ab.ensemble_job_id],
+              ] as const).map(([label, m, jobId]) => {
+                const masterId = renders
+                  .find((r) => r.id === jobId)
+                  ?.outputs.find((o) => o.asset_type === "master")?.id;
+                return (
+                  <tr key={label}>
+                    <td>{label}</td>
+                    <td>{Number(m.width_ratio).toFixed(3)}</td>
+                    <td>{Number(m.stereo_correlation).toFixed(3)}</td>
+                    <td>{Number(m.mono_compat).toFixed(3)}</td>
+                    <td>
+                      {masterId && (
+                        <audio
+                          controls
+                          preload="none"
+                          src={assetUrl(songId, masterId, { inline: true })}
+                        />
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {latest && latest.status === "succeeded" && (
         <>

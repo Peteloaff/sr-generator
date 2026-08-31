@@ -6,10 +6,10 @@ deterministic, section- and line-level control over *which authorized singer
 performs each vocal part*, with weighted ensembles, harmonies, doubles, gang
 vocals, and screams.
 
-> **Status: Stage 3 (Singing Voice Provider) complete.** A guide vocal is
-> converted into each singer's voice — real DSP (`local_dsp`), consent-gated,
-> deterministic; a neural model plugs into the same contract
-> ([MODEL_SETUP.md](MODEL_SETUP.md)). No music model yet. See [ROADMAP.md](ROADMAP.md).
+> **Status: Stage 4 (Vocal-Stack Quality) complete.** Harmony intervals, a
+> de-ess/EQ/compressor chain per role, savable presets, and an A/B that proves
+> ensemble mode beats a naive gain stack. A guide vocal is converted into each
+> singer's voice (Stage 3). No music model yet. See [ROADMAP.md](ROADMAP.md).
 
 ## What you can do today
 
@@ -20,9 +20,12 @@ vocals, and screams.
 - **Mark sections** (verse / chorus / breakdown / …) and edit lyrics as a text
   block that becomes per-line rows.
 - **Direct the vocals**: per section *or* per lyric line, add lead / double /
-  harmony / background / gang / scream roles, assign singers with **weights**,
-  and see the live normalized split and ensemble take counts
-  (`Brian 70 → 7 takes`).
+  harmony / background / gang / scream roles, assign singers with **weights** and
+  **harmony intervals** (`+3`, `-12`), attach a de-ess / EQ / compressor chain,
+  and see the live normalized split and ensemble take counts.
+- **Save a stack as a preset** and drop it on any section; **Render A/B** to see
+  ensemble mode measured against a naive gain stack (stereo width, L/R
+  correlation, mono-compatibility).
 - **Give each singer a voice**: upload training samples and run the analysis, or
   set the profile by hand (pitch / formant / brightness / breathiness /
   roughness). Training and generation are blocked until you grant consent.
@@ -76,11 +79,11 @@ sr/
   api/          FastAPI app + routers (bands, singers, voice_models, songs, vocal, render, jobs)
   models/       SQLAlchemy ORM (the core data model)
   schemas/      Pydantic request/response models
-  services/     vocal normalization, layering plan, render, voice consent, cache, project i/o
+  services/     normalization, layering, render, consent, cache, presets, project i/o
   providers/    ABCs + mock + local_dsp/http voice providers + registry
   worker/       job queue backends, runner, handlers, progress, RQ entrypoint
   orchestrator/ generation pipeline definition (stubs for now)
-  common/       allocation, seeds, storage, resolver, audio, dsp, synth, voice
+  common/       allocation, seeds, storage, resolver, audio, dsp, synth, voice, vocalfx
 alembic/        migrations
 apps/web/       Next.js UI (band switcher, song workspace, Vocal Director)
 scripts/        setup / dev / worker / test / stage_gate

@@ -244,3 +244,36 @@ converted, or uploaded — the simplest defensible rule.
 
 **Consequences.** Test fixtures that render must grant `consent_generation`
 (Stage 2 fixtures updated). Imported placeholder singers stay blocked by default.
+
+---
+
+## ADR-0016 — Vocal FX are deterministic NumPy, applied at the role stem
+
+**Context.** Stage 4 needs de-ess / EQ / compression "hooks". A real plugin chain
+means IIR filters (state, non-vectorisable in pure NumPy) or a C dependency.
+
+**Decision.** `sr/common/vocalfx.py` — full-signal FFT EQ, an envelope-follower
+de-esser and compressor built from vectorised moving averages (`np.convolve`),
+and `stack_gain = 1/√n`. Deterministic and fast. The chain
+(`VocalRole.processing_json`) runs once on the *summed role stem*, not per take.
+
+**Consequences.** Gentle, glue-level processing that is measurable in tests and
+reproducible. Not a mastering chain — a real plugin host / offline renderer can
+replace `apply_chain` later without touching the engine. Take stems are the raw
+pre-chain signal, so they stay clean for re-use.
+
+---
+
+## ADR-0017 — A/B is a first-class render mode, not a UI trick
+
+**Context.** The exit criterion is "A/B shows a clear difference between a gain
+mix and ensemble mode". That needs a defined, reproducible "gain mix" baseline.
+
+**Decision.** `render` takes `mode`: `flat` zeroes humanisation, stereo spread,
+interval-independent detune, stack-gain compensation, and the processing chain —
+a literal "same take, N copies" stack. `POST /sections/{id}/ab` renders both from
+the same seed and compares width / correlation / mono-compatibility, returning a
+machine-checkable verdict. The gate asserts on that verdict.
+
+**Consequences.** "It sounds more produced" becomes a number. Both renders are
+kept as normal jobs (with `result_json`), so the UI can play them side by side.

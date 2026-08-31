@@ -11,6 +11,7 @@ from sr.models.render_take import RenderTake
 from sr.models.singer import Singer
 from sr.models.song import LyricLine, Song, SongSection
 from sr.models.vocal import VocalAssignment, VocalRole
+from sr.models.vocal_preset import VocalPreset
 
 __all__ = [
     "Base",
@@ -22,6 +23,7 @@ __all__ = [
     "LyricLine",
     "VocalRole",
     "VocalAssignment",
+    "VocalPreset",
     "BandReference",
     "GenerationJob",
     "AudioAsset",

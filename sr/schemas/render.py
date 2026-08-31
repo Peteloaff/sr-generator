@@ -1,11 +1,24 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class RenderRequest(BaseModel):
     seed: int | None = None
     duration: float | None = Field(default=None, gt=0, le=600)
+    # "ensemble" = full production; "flat" = naive same-take stack (the A/B baseline)
+    mode: Literal["ensemble", "flat"] = "ensemble"
+
+
+class ABResult(BaseModel):
+    seed: int
+    ensemble_job_id: str
+    flat_job_id: str
+    ensemble: dict
+    flat: dict
+    verdict: dict
 
 
 class RenderTakeRead(BaseModel):

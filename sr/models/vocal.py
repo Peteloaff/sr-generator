@@ -9,7 +9,7 @@ controls.
 
 from __future__ import annotations
 
-from sqlalchemy import CheckConstraint, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, CheckConstraint, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from sr.models.base import Base, Timestamps, UUIDPrimaryKey
@@ -39,6 +39,10 @@ class VocalRole(UUIDPrimaryKey, Timestamps, Base):
     humanize_formant: Mapped[float] = mapped_column(Float, default=0.0)
     notes: Mapped[str | None] = mapped_column(Text, default=None)
 
+    # Ordered effects chain applied to the summed role stem, e.g.
+    # [{"type": "deesser", "amount": 0.5}, {"type": "compressor", "ratio": 3}, ...]
+    processing_json: Mapped[list | None] = mapped_column(JSON, default=None)
+
     section: Mapped[SongSection | None] = relationship(  # noqa: F821
         back_populates="vocal_roles",
         primaryjoin="SongSection.id == VocalRole.section_id",
@@ -66,7 +70,9 @@ class VocalAssignment(UUIDPrimaryKey, Timestamps, Base):
     weight_percent: Mapped[float] = mapped_column(Float, default=100.0)  # allocation, not gain
     gain_db: Mapped[float] = mapped_column(Float, default=0.0)
     pan: Mapped[float] = mapped_column(Float, default=0.0)  # -100..100
-    pitch_offset_semitones: Mapped[float] = mapped_column(Float, default=0.0)
+    # Musical interval this singer sings at: +3/+7 harmony, -12 octave double, ...
+    interval_semitones: Mapped[float] = mapped_column(Float, default=0.0)
+    pitch_offset_semitones: Mapped[float] = mapped_column(Float, default=0.0)  # fine detune
     timing_offset_ms: Mapped[float] = mapped_column(Float, default=0.0)
     formant_shift: Mapped[float] = mapped_column(Float, default=0.0)
     style: Mapped[str | None] = mapped_column(String(40), default=None)

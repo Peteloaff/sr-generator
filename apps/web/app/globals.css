@@ -83,6 +83,10 @@ button.danger { border-color: #d1667a; color: #f0a9b6; }
   padding: 0.75rem;
 }
 .voice-model input[type="range"] { accent-color: var(--accent); }
+.fx-chain { margin-top: 0.4rem; font-size: 0.85rem; display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; }
+.fx-chain .pill { display: inline-flex; align-items: center; gap: 0.2rem; }
+.ab { border: 1px solid var(--accent); border-radius: 8px; padding: 0.75rem; margin: 0.75rem 0; }
+.ab audio { max-width: 260px; height: 32px; }
 pre {
   background: var(--panel);
   border: 1px solid var(--line);

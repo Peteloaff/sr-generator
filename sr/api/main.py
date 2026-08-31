@@ -12,6 +12,7 @@ from sr.api.routers import (
     bands,
     health,
     jobs,
+    presets,
     projects,
     render,
     singers,
@@ -52,7 +53,10 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    for module in (health, bands, singers, voice_models, projects, songs, vocal, render, jobs):
+    for module in (
+        health, bands, singers, voice_models, projects, songs,
+        vocal, presets, render, jobs,
+    ):
         app.include_router(module.router)
 
     @app.get("/", tags=["meta"])

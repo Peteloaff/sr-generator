@@ -120,6 +120,22 @@ on read: the 100%-scaled split (`normalize_weights`) and — for ensemble roles
 `largest_remainder_allocation`. Lead/double are always one take. The UI shows
 `Brian 70 → 7 takes` without ever mutating the stored weights.
 
+## Vocal-stack quality (Stage 4)
+
+- **Harmony intervals** — `VocalAssignment.interval_semitones`; `plan_role_takes`
+  adds `(interval + detune) * 100 + jitter` cents. Kept in `flat` mode.
+- **Per-role processing** (`sr/common/vocalfx.py`) — `VocalRole.processing_json`
+  is an ordered chain (`deesser` / `eq` / `compressor`) run on the summed role
+  stem. Plus `stack_gain(n) = 1/√n` so a 12-take gang doesn't build up 12×.
+- **A/B** — `render` takes `mode`: `ensemble` (full) or `flat` (naive: no
+  humanisation / spread / stack-comp / chain — "the same take, N copies").
+  `POST /sections/{id}/ab` renders both, then compares `width_ratio` (side/mid
+  RMS), `stereo_correlation` (L vs R), `mono_compat` (mono-sum energy retained).
+  Verdict `ensemble_clearly_different` = wider **and** less correlated **and** no
+  phase collapse.
+- **`VocalPreset`** (`sr/services/presets.py`) — captures roles with singers *by
+  name*, so a stack recipe applies to any section of any band.
+
 ## Singing voice provider (Stage 3)
 
 A guide vocal (one melody/phrase per section) is converted into each singer's

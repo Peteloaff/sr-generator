@@ -3,7 +3,15 @@
 `scripts/test.ps1` runs ruff + pytest. `scripts/stage_gate.py <N>` checks a
 stage's exit criteria and prints PASS/FAIL.
 
-## Stage 3 — automated (79 tests total, all passing)
+## Stage 4 — automated (112 tests total, all passing)
+
+| Area | File | Covers |
+|---|---|---|
+| Vocal FX | `tests/test_vocalfx.py` | `stack_gain` = 1/√n; EQ shifts the spectrum; de-esser ducks sibilant peaks but leaves the body; compressor reduces dynamic range; `apply_chain` order; metrics separate wide from mono |
+| Stack quality | `tests/test_stage4.py` | harmony intervals land at ±300 / ±700 cents; `flat` mode zeroes all variation; processing chain recorded on the role stem; **A/B verdict `ensemble_clearly_different`** — wider + less correlated + `mono_compat > 0.5` (no phase collapse); individual takes still downloadable |
+| Presets | `tests/test_presets.py` | capture from section → apply → roles + intervals restored; unknown singers skipped (not fatal); name unique per band |
+
+## Stage 3 — automated (79 tests, all passing)
 
 | Area | File | Covers |
 |---|---|---|
@@ -57,9 +65,10 @@ stage's exit criteria and prints PASS/FAIL.
 
 ## Audio evaluation protocol
 
-**Automated now** (Stage 2–3): repeatability (master byte-identical across
-re-renders from a seed), each singer renders independently, phase — no collapse
-because takes are summed as distinct stereo signals, stems always exportable.
+**Automated now** (Stage 2–4): repeatability (master byte-identical across
+re-renders from a seed), each singer renders independently, **A/B ensemble vs
+flat gain-mix** (`test_ab_shows_ensemble_is_clearly_different`) with a
+phase-collapse check (`mono_compat`), stems always exportable.
 
 **Deferred to a real neural `VoiceProvider`** — the `local_dsp` provider proves
 the pipeline, not audio quality, so subjective scoring waits:

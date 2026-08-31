@@ -44,6 +44,7 @@ class JobRead(BaseModel):
     song_id: str | None
     section_id: str | None
     parameters_json: dict[str, Any] | None
+    result_json: dict[str, Any] | None
     input_asset_ids: list[str] | None
     logs: str | None
     error: str | None

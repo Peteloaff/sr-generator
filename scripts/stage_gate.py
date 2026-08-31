@@ -357,7 +357,93 @@ def stage3(client) -> list[Row]:
     return rows
 
 
-STAGES = {"0": stage0, "1": stage1, "2": stage2, "3": stage3}
+def stage4(client) -> list[Row]:
+    rows: list[Row] = []
+    singers = {}
+    for n in ("Brian", "Pete", "Brad"):
+        sid = client.post("/singers", json={"name": n}).json()["id"]
+        client.patch(f"/singers/{sid}", json={"consent_generation": True})
+        singers[n] = sid
+    song = client.post("/songs", json={"title": "Gate S4", "seed": 42}).json()["id"]
+    section = client.post(
+        f"/songs/{song}/sections",
+        json={"section_type": "chorus", "start_time": 0, "end_time": 3},
+    ).json()["id"]
+    client.post(
+        f"/sections/{section}/roles",
+        json={"role_type": "lead", "assignments": [{"singer_id": singers["Brian"]}]},
+    )
+    client.post(
+        f"/sections/{section}/roles",
+        json={
+            "role_type": "gang", "ensemble_size": 12, "width": 90,
+            "humanize_timing_ms": 22, "humanize_pitch_cents": 9,
+            "processing": [{"type": "deesser", "amount": 0.4}, {"type": "compressor", "ratio": 3}],
+            "assignments": [
+                {"singer_id": singers["Brian"], "weight_percent": 50},
+                {"singer_id": singers["Pete"], "weight_percent": 30},
+                {"singer_id": singers["Brad"], "weight_percent": 20},
+            ],
+        },
+    )
+    harm = client.post(
+        f"/sections/{section}/roles",
+        json={
+            "role_type": "harmony", "ensemble_size": 2, "humanize_pitch_cents": 0,
+            "assignments": [
+                {"singer_id": singers["Pete"], "weight_percent": 50, "interval_semitones": 3},
+                {"singer_id": singers["Brad"], "weight_percent": 50, "interval_semitones": 7},
+            ],
+        },
+    ).json()
+
+    try:
+        ab = client.post(f"/songs/{song}/sections/{section}/ab", json={}).json()
+        v = ab["verdict"]
+        rows.append(
+            ("A/B: ensemble clearly different from flat gain-mix",
+             bool(v["ensemble_clearly_different"]),
+             f"width +{v['width_gain']}, corr {ab['ensemble']['stereo_correlation']}")
+        )
+        rows.append(
+            ("No phase collapse in the ensemble stack",
+             ab["ensemble"]["mono_compat"] > 0.5,
+             f"mono_compat {ab['ensemble']['mono_compat']}")
+        )
+        takes = client.get(f"/songs/{song}/renders/{ab['ensemble_job_id']}/takes").json()
+        ta = [a for a in client.get(f"/songs/{song}/assets").json()
+              if a["asset_type"] == "take_stem"]
+        wav = client.get(f"/songs/{song}/assets/{ta[0]['id']}/download").content
+        rows.append(
+            ("Individual takes remain exportable",
+             len(ta) >= len(takes) > 0 and wav[:4] == b"RIFF", f"{len(ta)} take stems")
+        )
+        hp = {t["singer_id"]: t["pitch_cents"]
+              for t in takes if t["vocal_role_id"] == harm["id"]}
+        ok = (abs(hp.get(singers["Pete"], 0) - 300) < 2
+              and abs(hp.get(singers["Brad"], 0) - 700) < 2)
+        rows.append(("Harmony intervals land at the right pitch", ok, str(sorted(hp.values()))))
+    except Exception as exc:  # noqa: BLE001
+        rows.append(("A/B render", False, repr(exc)))
+
+    try:
+        p = client.post(
+            "/vocal-presets", json={"name": "Gate Big Chorus", "from_section_id": section}
+        ).json()
+        sec2 = client.post(f"/songs/{song}/sections", json={"section_type": "bridge"}).json()["id"]
+        res = client.post(f"/vocal-presets/{p['id']}/apply", json={"section_id": sec2}).json()
+        rows.append(
+            ("Vocal preset saves + applies to another section",
+             len(res["created_roles"]) == 3 and res["skipped_singers"] == [],
+             f"{len(res['created_roles'])} roles")
+        )
+    except Exception as exc:  # noqa: BLE001
+        rows.append(("Vocal presets", False, repr(exc)))
+
+    return rows
+
+
+STAGES = {"0": stage0, "1": stage1, "2": stage2, "3": stage3, "4": stage4}
 
 
 def main() -> int:

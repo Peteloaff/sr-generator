@@ -35,7 +35,16 @@ def _round(v: float, n: int = 3) -> float:
     return round(float(v), n)
 
 
-def plan_role_takes(role: VocalRole, parent_seed: int) -> list[TakeSpec]:
+def plan_role_takes(
+    role: VocalRole, parent_seed: int, *, flat: bool = False
+) -> list[TakeSpec]:
+    """Plan the takes for a role.
+
+    ``flat=True`` is the A/B baseline - a naive "same take, N copies" stack: no
+    humanisation, no stereo spread, no interval-independent detune. Musical
+    intervals (harmony/octave) are kept even in flat mode; they are the
+    arrangement, not the production.
+    """
     if not role.assignments:
         return []
 
@@ -47,32 +56,39 @@ def plan_role_takes(role: VocalRole, parent_seed: int) -> list[TakeSpec]:
         weights, ensemble, tie_break_order=sorted(weights)
     ).counts
 
-    flat: list[str] = []
+    take_order: list[str] = []
     for singer_id in sorted(alloc):
-        flat.extend([singer_id] * alloc[singer_id])
-    total = len(flat)
+        take_order.extend([singer_id] * alloc[singer_id])
+    total = len(take_order)
 
     specs: list[TakeSpec] = []
     per_singer_idx: dict[str, int] = {}
-    for global_idx, singer_id in enumerate(flat):
+    for global_idx, singer_id in enumerate(take_order):
         k = per_singer_idx.get(singer_id, 0)
         per_singer_idx[singer_id] = k + 1
         a = fixed[singer_id]
 
         base = derive_seed(parent_seed, role.id, singer_id, k)
-        ht, hp, hf = role.humanize_timing_ms, role.humanize_pitch_cents, role.humanize_formant
-        jt = bounded_jitter(derive_seed(base, "timing"), -ht, ht)
-        jp = bounded_jitter(derive_seed(base, "pitch"), -hp, hp)
-        jf = bounded_jitter(derive_seed(base, "formant"), -hf, hf)
-
-        # Deterministic stereo spread: takes fan out across +/- role.width.
-        if total > 1 and role.width > 0:
-            pos = (global_idx / (total - 1)) - 0.5  # -0.5 .. 0.5
-            spread = pos * 2.0 * role.width
-            spread += bounded_jitter(derive_seed(base, "pan"), -role.width * 0.1, role.width * 0.1)
+        if flat:
+            jt = jp = jf = spread = 0.0
         else:
-            spread = 0.0
+            ht, hp, hf = (
+                role.humanize_timing_ms, role.humanize_pitch_cents, role.humanize_formant
+            )
+            jt = bounded_jitter(derive_seed(base, "timing"), -ht, ht)
+            jp = bounded_jitter(derive_seed(base, "pitch"), -hp, hp)
+            jf = bounded_jitter(derive_seed(base, "formant"), -hf, hf)
+            # Deterministic stereo spread: takes fan out across +/- role.width.
+            if total > 1 and role.width > 0:
+                pos = (global_idx / (total - 1)) - 0.5  # -0.5 .. 0.5
+                spread = pos * 2.0 * role.width
+                spread += bounded_jitter(
+                    derive_seed(base, "pan"), -role.width * 0.1, role.width * 0.1
+                )
+            else:
+                spread = 0.0
 
+        interval = getattr(a, "interval_semitones", 0.0) or 0.0
         specs.append(
             TakeSpec(
                 role_id=role.id,
@@ -81,7 +97,7 @@ def plan_role_takes(role: VocalRole, parent_seed: int) -> list[TakeSpec]:
                 take_index=k,
                 child_seed=base,
                 timing_offset_ms=_round(a.timing_offset_ms + jt),
-                pitch_cents=_round(a.pitch_offset_semitones * 100.0 + jp),
+                pitch_cents=_round((interval + a.pitch_offset_semitones) * 100.0 + jp),
                 formant_shift=_round(a.formant_shift + jf),
                 gain_db=_round(a.gain_db),
                 pan=_round(max(-100.0, min(100.0, a.pan + spread))),

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from sr.models.enums import VocalRoleType
@@ -10,6 +12,7 @@ class VocalAssignmentCreate(BaseModel):
     weight_percent: float = Field(default=100.0, ge=0)
     gain_db: float = 0.0
     pan: float = Field(default=0.0, ge=-100, le=100)
+    interval_semitones: float = Field(default=0.0, ge=-24, le=24)
     pitch_offset_semitones: float = 0.0
     timing_offset_ms: float = 0.0
     formant_shift: float = 0.0
@@ -21,6 +24,7 @@ class VocalAssignmentUpdate(BaseModel):
     weight_percent: float | None = Field(default=None, ge=0)
     gain_db: float | None = None
     pan: float | None = Field(default=None, ge=-100, le=100)
+    interval_semitones: float | None = Field(default=None, ge=-24, le=24)
     pitch_offset_semitones: float | None = None
     timing_offset_ms: float | None = None
     formant_shift: float | None = None
@@ -37,6 +41,7 @@ class VocalAssignmentRead(BaseModel):
     weight_percent: float
     gain_db: float
     pan: float
+    interval_semitones: float
     pitch_offset_semitones: float
     timing_offset_ms: float
     formant_shift: float
@@ -52,6 +57,7 @@ class VocalRoleCreate(BaseModel):
     humanize_pitch_cents: float = Field(default=0.0, ge=0)
     humanize_formant: float = Field(default=0.0, ge=0)
     notes: str | None = None
+    processing: list[dict[str, Any]] | None = None
     assignments: list[VocalAssignmentCreate] = Field(default_factory=list)
 
 
@@ -63,6 +69,7 @@ class VocalRoleUpdate(BaseModel):
     humanize_pitch_cents: float | None = Field(default=None, ge=0)
     humanize_formant: float | None = Field(default=None, ge=0)
     notes: str | None = None
+    processing: list[dict[str, Any]] | None = None
 
 
 class NormalizedShare(BaseModel):
@@ -85,4 +92,5 @@ class VocalRoleRead(BaseModel):
     humanize_pitch_cents: float
     humanize_formant: float
     notes: str | None
+    processing_json: list[dict[str, Any]] | None
     assignments: list[VocalAssignmentRead] = []

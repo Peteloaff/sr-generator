@@ -86,6 +86,7 @@ def run_job(job_id: str) -> str:
                 )
             job.provider = result.provider
             job.provider_version = result.provider_version
+            job.result_json = result.metadata or None
             for line in result.logs:
                 job.append_log(line)
             db.flush()

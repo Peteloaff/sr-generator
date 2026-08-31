@@ -19,7 +19,7 @@ from sr.models.singer import Singer
 from sr.models.song import Song, SongSection
 from sr.schemas.audio import AudioAssetRead
 from sr.schemas.job import JobRead
-from sr.schemas.render import RenderRequest, RenderTakeRead
+from sr.schemas.render import ABResult, RenderRequest, RenderTakeRead
 from sr.services.consent import blocked_for_generation
 from sr.worker.queue import get_queue
 
@@ -164,10 +164,13 @@ async def upload_guide_vocal(
 def render_section_endpoint(
     song_id: str, section_id: str, body: RenderRequest, db: Session = Depends(get_db)
 ) -> GenerationJob:
+    return _queue_render(db, *_check_renderable(db, song_id, section_id), body)
+
+
+def _check_renderable(db: Session, song_id: str, section_id: str):
     section = _section(db, song_id, section_id)
     if not any(r.assignments for r in section.vocal_roles):
         raise HTTPException(422, "section has no vocal roles with singer assignments")
-
     assigned = {a.singer_id for r in section.vocal_roles for a in r.assignments}
     singers = list(db.scalars(select(Singer).where(Singer.id.in_(assigned))))
     blocked = blocked_for_generation(singers)
@@ -177,12 +180,17 @@ def render_section_endpoint(
             f"consent_generation is not authorized for: {', '.join(blocked)}. "
             "Grant it on the singer before rendering.",
         )
+    return song_id, section_id, section
 
+
+def _queue_render(db, song_id, section_id, section, body: RenderRequest) -> GenerationJob:
     seed = body.seed if body.seed is not None else (section.generation_seed or section.song.seed)
+    params = {"mode": body.mode}
+    if body.duration is not None:
+        params["duration"] = body.duration
     job = GenerationJob(
         job_type="render_section", song_id=song_id, section_id=section_id,
-        seed=seed, provider="layering-engine", status="queued",
-        parameters_json={k: v for k, v in {"duration": body.duration}.items() if v is not None},
+        seed=seed, provider="layering-engine", status="queued", parameters_json=params,
     )
     db.add(job)
     db.commit()
@@ -190,6 +198,50 @@ def render_section_endpoint(
     get_queue().enqueue(job.id)
     db.refresh(job)
     return job
+
+
+@router.post("/{song_id}/sections/{section_id}/ab", response_model=ABResult)
+def render_ab(
+    song_id: str, section_id: str, body: RenderRequest, db: Session = Depends(get_db)
+) -> ABResult:
+    """Render the section twice - naive 'flat' stack vs full 'ensemble' - and
+    compare: ensemble should be measurably wider with no phase collapse."""
+    song_id, section_id, section = _check_renderable(db, song_id, section_id)
+    queue = get_queue()
+
+    jobs: dict[str, GenerationJob] = {}
+    for mode in ("flat", "ensemble"):
+        req = body.model_copy(update={"mode": mode})
+        job = _queue_render(db, song_id, section_id, section, req)
+        try:
+            queue.wait(job.id, timeout=180)
+        except TimeoutError as exc:
+            raise HTTPException(504, f"{mode} render timed out") from exc
+        db.refresh(job)
+        if job.status != "succeeded":
+            raise HTTPException(500, f"{mode} render failed: {job.error}")
+        jobs[mode] = job
+
+    ens = jobs["ensemble"].result_json.get("ab", {})
+    flat = jobs["flat"].result_json.get("ab", {})
+    verdict = {
+        "wider": ens.get("width_ratio", 0) > flat.get("width_ratio", 0) + 0.01,
+        "less_correlated": ens.get("stereo_correlation", 1)
+        < flat.get("stereo_correlation", 1) - 0.02,
+        "no_phase_collapse": ens.get("mono_compat", 0) > 0.5,
+        "width_gain": round(ens.get("width_ratio", 0) - flat.get("width_ratio", 0), 4),
+    }
+    verdict["ensemble_clearly_different"] = bool(
+        verdict["wider"] and verdict["less_correlated"] and verdict["no_phase_collapse"]
+    )
+    return ABResult(
+        seed=jobs["ensemble"].seed,
+        ensemble_job_id=jobs["ensemble"].id,
+        flat_job_id=jobs["flat"].id,
+        ensemble=ens,
+        flat=flat,
+        verdict=verdict,
+    )
 
 
 @router.get("/{song_id}/sections/{section_id}/renders", response_model=list[JobRead])

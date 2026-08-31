@@ -19,7 +19,7 @@ import numpy as np
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from sr.common import dsp
+from sr.common import dsp, vocalfx
 from sr.common.seeds import derive_seed
 from sr.common.storage import get_storage
 from sr.common.synth import mock_singer_take
@@ -145,6 +145,8 @@ def render_section(
     n = max(1, int(round(seconds * dsp.SR)))
     storage = get_storage()
     base_key = f"renders/{song.id[:8]}/{job.id[:8]}"
+    mode = str(params.get("mode", "ensemble"))
+    is_flat = mode == "flat"
 
     assigned_ids = {a.singer_id for r in section.vocal_roles for a in r.assignments}
     singers = {
@@ -183,7 +185,7 @@ def render_section(
 
     roles = list(enumerate(section.vocal_roles))
     for ri, role in roles:
-        specs = plan_role_takes(role, seed)
+        specs = plan_role_takes(role, seed, flat=is_flat)
         if not specs:
             continue
         take_arrays: list[np.ndarray] = []
@@ -209,11 +211,17 @@ def render_section(
             ))
 
         role_mix = dsp.sum_stereo(take_arrays, n)
+        fx_log: list[str] = []
+        if not is_flat:
+            role_mix = (role_mix * vocalfx.stack_gain(len(specs))).astype(np.float32)
+            role_mix, fx_log = vocalfx.apply_chain(role_mix, role.processing_json)
         role_key = f"{base_key}/r{ri}_{role.role_type}_stem.wav"
         dsp.save_wav(storage.path_for(role_key), role_mix)
+        chain_note = f" [{'+'.join(fx_log)}]" if fx_log else ""
         role_asset = _asset(
             asset_type="role_stem", file_path=role_key,
-            label=f"{role.role_type} stem ({len(specs)} take{'s' if len(specs) != 1 else ''})",
+            label=f"{role.role_type} stem "
+            f"({len(specs)} take{'s' if len(specs) != 1 else ''}){chain_note}",
         )
         for ta in take_assets:
             ta.parent_asset_id = role_asset.id
@@ -248,7 +256,19 @@ def render_section(
     vocal_bus, _ = dsp.peak_normalize(dsp.sum_stereo(bus_mixes, n))
     vb_key = f"{base_key}/vocal_bus.wav"
     dsp.save_wav(storage.path_for(vb_key), vocal_bus)
-    vb_asset = _asset(asset_type="vocal_bus", file_path=vb_key, label="all vocals")
+    vb_asset = _asset(asset_type="vocal_bus", file_path=vb_key, label=f"all vocals ({mode})")
+
+    ab = {
+        "mode": mode,
+        "width_ratio": round(vocalfx.width_ratio(vocal_bus), 4),
+        "stereo_correlation": round(vocalfx.stereo_correlation(vocal_bus), 4),
+        "mono_compat": round(vocalfx.mono_compat(vocal_bus), 4),
+        "vocal_rms_dbfs": round(dsp.rms_dbfs(vocal_bus), 2),
+    }
+    logs.append(
+        f"A/B [{mode}] width={ab['width_ratio']} corr={ab['stereo_correlation']} "
+        f"mono_compat={ab['mono_compat']}"
+    )
 
     instr = db.scalar(
         select(AudioAsset).where(
@@ -288,8 +308,8 @@ def render_section(
         provider_version=ENGINE_VERSION,
         outputs=[],
         metadata={
-            "section_id": section_id, "seed": seed, "seconds": seconds,
-            "roles": role_summary, "source_kinds": src_kinds,
+            "section_id": section_id, "seed": seed, "seconds": seconds, "mode": mode,
+            "roles": role_summary, "source_kinds": src_kinds, "ab": ab,
             "master_asset_id": master_asset.id, "mix_asset_id": mix_asset.id,
         },
         logs=logs,
