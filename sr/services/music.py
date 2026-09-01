@@ -12,7 +12,6 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from sr.common import dsp
 from sr.common.storage import get_storage
 from sr.models.audio_asset import AudioAsset
 from sr.models.band import Band
@@ -116,7 +115,7 @@ def generate_instrumental(
     storage = get_storage()
     base = f"references/{song.band_id}/{song.id}/{section_id}/instrumental"
     key_path = f"{base}/canonical.wav"
-    dsp.save_wav(storage.path_for(key_path), result.audio, result.sample_rate)
+    storage.save_wav(key_path, result.audio, result.sample_rate)
 
     for old in db.scalars(
         select(AudioAsset).where(

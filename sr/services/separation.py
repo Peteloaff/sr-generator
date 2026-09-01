@@ -7,7 +7,6 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from sr.common import dsp
 from sr.common.storage import get_storage
 from sr.models.audio_asset import AudioAsset
 from sr.models.generation_job import GenerationJob
@@ -17,8 +16,8 @@ from sr.providers.registry import get_provider
 from sr.worker.progress import report as report_progress
 
 
-def _canonical_of(asset: AudioAsset) -> Path:
-    return get_storage().path_for(f"{Path(asset.file_path).parent}/canonical.wav")
+def _canonical_key(asset: AudioAsset) -> str:
+    return f"{Path(asset.file_path).parent}/canonical.wav"
 
 
 def separate_song(
@@ -34,15 +33,15 @@ def separate_song(
     )
     if upload is None:
         raise ValueError("song has no uploaded mix to separate")
-    source = _canonical_of(upload)
-    if not source.exists():
+    storage = get_storage()
+    source_key = _canonical_key(upload)
+    if not storage.exists(source_key):
         raise ValueError("uploaded mix canonical WAV is missing")
 
     report_progress(db, job, 0.1, "separating")
     provider = get_provider("stem")
-    sep = provider.separate(source_path=source, params=params)
+    sep = provider.separate(source_path=storage.ensure_local(source_key), params=params)
 
-    storage = get_storage()
     base_key = f"stems/{song_id[:8]}/{job.id[:8]}"
     made: list[dict] = []
     for i, (stem_type, arr) in enumerate(sorted(sep.stems.items())):
@@ -58,7 +57,7 @@ def separate_song(
         version = (prior.version + 1) if prior else 1
         key = f"{base_key}/{stem_type}_v{version}.wav"
         stereo = arr if arr.ndim == 2 else arr.reshape(-1, 1).repeat(2, axis=1)
-        dsp.save_wav(storage.path_for(key), stereo, sep.sample_rate)
+        storage.save_wav(key, stereo, sep.sample_rate)
         db.add(
             AudioAsset(
                 song_id=song_id, generation_job_id=job.id, parent_asset_id=upload.id,

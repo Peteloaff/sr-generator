@@ -25,8 +25,8 @@ from sr.worker.progress import report as report_progress
 _XFADE = 0.012  # seconds
 
 
-def _canonical(asset: AudioAsset) -> Path:
-    return get_storage().path_for(f"{Path(asset.file_path).parent}/canonical.wav")
+def _canonical_key(asset: AudioAsset) -> str:
+    return f"{Path(asset.file_path).parent}/canonical.wav"
 
 
 def _latest(
@@ -62,7 +62,7 @@ def _latest_render_vocal(db: Session, song_id: str, section_id: str) -> np.ndarr
     )
     if vb is None:
         return None
-    return dsp.load_stereo(get_storage().path_for(vb.file_path))
+    return get_storage().read_stereo(vb.file_path)
 
 
 def assemble_song(
@@ -79,7 +79,7 @@ def assemble_song(
     if upload is None:
         raise ValueError("song has no uploaded mix to assemble against")
 
-    original = dsp.load_stereo(_canonical(upload))
+    original = get_storage().read_stereo(_canonical_key(upload))
     total = original.shape[0]
     sr = dsp.SR
     out = original.copy()
@@ -87,7 +87,7 @@ def assemble_song(
     instr_asset = _latest(db, song_id, "stem_instrumental", None)
     instrumental = (
         dsp.fit_length(
-            dsp.load_stereo(get_storage().path_for(instr_asset.file_path)), total
+            get_storage().read_stereo(instr_asset.file_path), total
         )
         if instr_asset is not None
         else None
@@ -133,7 +133,7 @@ def assemble_song(
     )
     version = (prior.version + 1) if prior else 1
     key = f"mixes/{song_id[:8]}/song_mix_v{version}.wav"
-    dsp.save_wav(storage.path_for(key), out, sr)
+    storage.save_wav(key, out, sr)
     asset = AudioAsset(
         song_id=song_id, generation_job_id=job.id, parent_asset_id=upload.id,
         asset_type="song_mix", file_path=key, version=version,

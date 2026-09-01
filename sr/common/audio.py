@@ -16,7 +16,7 @@ from pathlib import Path
 import imageio_ffmpeg
 import numpy as np
 
-from sr.common.storage import LocalStorage
+from sr.common.storage import Storage
 
 FFMPEG = imageio_ffmpeg.get_ffmpeg_exe()
 CANONICAL_RATE = 44100
@@ -87,7 +87,7 @@ class IngestResult:
 
 
 def ingest_upload(
-    storage: LocalStorage, base_key: str, filename: str, data: bytes
+    storage: Storage, base_key: str, filename: str, data: bytes
 ) -> IngestResult:
     """Store an uploaded audio file: original + canonical WAV + waveform peaks.
 
@@ -105,8 +105,11 @@ def ingest_upload(
     peaks_key = f"{base_key}/peaks.json"
     storage.write_bytes(original_key, data)
     try:
-        info = to_canonical_wav(storage.path_for(original_key), storage.path_for(canonical_key))
-        peaks = waveform_peaks(storage.path_for(canonical_key))
+        src = storage.ensure_local(original_key)
+        canonical = storage.path_for(canonical_key)
+        info = to_canonical_wav(src, canonical)
+        storage.persist(canonical_key)
+        peaks = waveform_peaks(canonical)
     except Exception as exc:  # noqa: BLE001
         raise ValueError(f"could not decode audio: {exc}") from exc
     storage.write_text(peaks_key, json.dumps(peaks))

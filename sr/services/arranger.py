@@ -53,9 +53,9 @@ def _section_energy(db: Session, section: SongSection) -> float:
         ).order_by(AudioAsset.created_at.desc())
     )
     if bed is not None:
-        path = get_storage().path_for(bed.file_path)
-        if path.exists():
-            rms = dsp.rms_dbfs(dsp.load_stereo(path))
+        st = get_storage()
+        if st.exists(bed.file_path):
+            rms = dsp.rms_dbfs(st.read_stereo(bed.file_path))
             return float(np.clip((rms + 30.0) / 24.0, 0.0, 1.0))
     return _TYPE_ENERGY.get(section.section_type, 0.6)
 

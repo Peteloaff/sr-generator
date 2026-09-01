@@ -186,7 +186,10 @@ def snapshot_training_manifest(band_id: str, db: Session = Depends(get_db)) -> M
         ) from exc
 
     storage = get_storage()
-    existing = sorted(storage.root.glob(f"models/band/{band.id}/manifest_v*.json"))
+    existing = [
+        k for k in storage.list(f"models/band/{band.id}/")
+        if k.rsplit("/", 1)[-1].startswith("manifest_v") and k.endswith(".json")
+    ]
     version = len(existing) + 1
     key = f"models/band/{band.id}/manifest_v{version}.json"
     manifest["snapshot_version"] = version

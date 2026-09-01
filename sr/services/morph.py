@@ -132,7 +132,7 @@ def render_morph_preview(
     storage = get_storage()
     key = f"morphs/{section.id[:8]}/{morph_id[:8]}_preview.wav"
     stereo = np.stack([mixed, mixed], axis=1).astype(np.float32)
-    dsp.save_wav(storage.path_for(key), stereo, dsp.SR)
+    storage.save_wav(key, stereo, dsp.SR)
 
     if morph.preview_asset_id:
         old = db.get(AudioAsset, morph.preview_asset_id)

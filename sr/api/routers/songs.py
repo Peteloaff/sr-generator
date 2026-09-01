@@ -144,12 +144,16 @@ def get_waveform(song_id: str, asset_id: str, db: Session = Depends(get_db)) -> 
     storage = get_storage()
     base = str(Path(asset.file_path).parent)
     peaks_key = f"{base}/peaks.json"
+    canonical_key = f"{base}/canonical.wav"
     if storage.exists(peaks_key):
         peaks = json.loads(storage.read_bytes(peaks_key))
     else:
-        canonical = storage.path_for(f"{base}/canonical.wav")
-        if not canonical.exists():
-            audio.to_canonical_wav(storage.path_for(asset.file_path), canonical)
+        if storage.exists(canonical_key):
+            canonical = storage.ensure_local(canonical_key)
+        else:
+            canonical = storage.path_for(canonical_key)
+            audio.to_canonical_wav(storage.ensure_local(asset.file_path), canonical)
+            storage.persist(canonical_key)
         peaks = audio.waveform_peaks(canonical)
         storage.write_text(peaks_key, json.dumps(peaks))
     return WaveformRead(

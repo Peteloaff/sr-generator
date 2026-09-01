@@ -22,11 +22,17 @@ rq = [
     "rq>=2.0",
     "redis>=5.2",
 ]
+# Cloud deployment: Postgres driver + S3-compatible object storage (Supabase Storage).
+cloud = [
+    "psycopg[binary]>=3.2",
+    "boto3>=1.35",
+]
 dev = [
     "pytest>=8.3",
     "httpx>=0.28",
     "fakeredis>=2.26",
     "ruff>=0.8",
+    "moto[s3]>=5.0",
 ]
 
 [project.scripts]

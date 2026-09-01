@@ -17,7 +17,7 @@ import numpy as np
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from sr.common.dsp import SR, save_wav
+from sr.common.dsp import SR
 from sr.common.storage import get_storage
 from sr.models.render_cache import RenderCache
 
@@ -68,7 +68,7 @@ def store(
 ) -> str:
     fk = _file_key(cache_key, kind)
     stereo = samples if samples.ndim == 2 else np.stack([samples, samples], axis=1)
-    save_wav(get_storage().path_for(fk), stereo.astype(np.float32), sample_rate)
+    get_storage().save_wav(fk, stereo.astype(np.float32), sample_rate)
     if db is not None and db.scalar(
         select(RenderCache).where(RenderCache.cache_key == cache_key)
     ) is None:

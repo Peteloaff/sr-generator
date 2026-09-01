@@ -177,9 +177,9 @@ def _train_singer(job: GenerationJob, db: Session) -> base.ProviderResult:
     )
     paths: list[Path] = []
     for a in samples:
-        canonical = storage.path_for(f"{Path(a.file_path).parent}/canonical.wav")
-        if canonical.exists():
-            paths.append(canonical)
+        canonical_key = f"{Path(a.file_path).parent}/canonical.wav"
+        if storage.exists(canonical_key):
+            paths.append(storage.ensure_local(canonical_key))
     if not paths:
         raise ValueError("no training samples uploaded for this singer")
 

@@ -25,6 +25,15 @@ class Settings(BaseSettings):
 
     storage_root: Path = REPO_ROOT / "storage"
 
+    # "local" (filesystem, default) or "s3" (Supabase Storage / any S3-compatible)
+    storage_backend: str = "local"
+    s3_endpoint_url: str = ""
+    s3_region: str = ""
+    s3_bucket: str = ""
+    s3_access_key_id: str = ""
+    s3_secret_access_key: str = ""
+    s3_workdir: str = ""  # local scratch dir for the object store (default: a tmp dir)
+
     music_provider: str = "local_synth"
     music_http_url: str = ""
     voice_provider: str = "local_dsp"

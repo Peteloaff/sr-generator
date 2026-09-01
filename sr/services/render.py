@@ -63,10 +63,6 @@ def _to_mono(x: np.ndarray, n: int, src_sr: int = dsp.SR) -> np.ndarray:
     return np.concatenate([x, np.zeros(n - x.shape[0], dtype=np.float32)]).astype(np.float32)
 
 
-def _load_mono(path: Path, n: int) -> np.ndarray:
-    return _to_mono(dsp.load_stereo(path), n)
-
-
 def _base_vocal(
     db: Session, section: SongSection, singer: Singer, n: int, seconds: float, seed: int
 ) -> tuple[np.ndarray, str, str | None]:
@@ -81,9 +77,9 @@ def _base_vocal(
         )
     )
     if take is not None:
-        canonical = storage.path_for(f"{Path(take.file_path).parent}/canonical.wav")
-        if canonical.exists():
-            return _load_mono(canonical, n), "upload", take.id
+        canonical_key = f"{Path(take.file_path).parent}/canonical.wav"
+        if storage.exists(canonical_key):
+            return _to_mono(storage.read_stereo(canonical_key), n), "upload", take.id
 
     guide = db.scalar(
         select(AudioAsset).where(
@@ -95,8 +91,9 @@ def _base_vocal(
         and singer.training_status == "ready"
         and singer.voice_profile_json
     ):
-        guide_canonical = storage.path_for(f"{Path(guide.file_path).parent}/canonical.wav")
-        if guide_canonical.exists():
+        guide_key = f"{Path(guide.file_path).parent}/canonical.wav"
+        if storage.exists(guide_key):
+            guide_canonical = storage.ensure_local(guide_key)
             provider = get_provider("voice")
             ck = cache.key_for(
                 "voice_conversion",
@@ -106,7 +103,7 @@ def _base_vocal(
             )
             hit = cache.lookup(ck, db=db)
             if hit is not None:
-                return _load_mono(storage.path_for(hit), n), "converted", guide.id
+                return _to_mono(storage.read_stereo(hit), n), "converted", guide.id
             conv = provider.convert(
                 guide_path=guide_canonical,
                 profile=singer.voice_profile_json,
@@ -118,7 +115,7 @@ def _base_vocal(
                 provider_version=conv.provider_version,
                 samples=conv.samples, sample_rate=conv.sample_rate, db=db,
             )
-            return _load_mono(storage.path_for(fk), n), "converted", guide.id
+            return _to_mono(storage.read_stereo(fk), n), "converted", guide.id
 
     placeholder_seed = derive_seed(seed, "placeholder", singer.id)
     placeholder = mock_singer_take(singer.id, section.id, seconds, placeholder_seed)
@@ -206,7 +203,7 @@ def render_section(
             take_arrays.append(processed)
             who = names.get(spec.singer_id, spec.singer_id)
             key = f"{base_key}/r{ri}_{role.role_type}_take{ti}.wav"
-            dsp.save_wav(storage.path_for(key), processed)
+            storage.save_wav(key, processed)
             ta = _asset(
                 singer_id=spec.singer_id, asset_type="take_stem", file_path=key,
                 label=f"{role.role_type} - {who} take {spec.take_index + 1} ({src_kind})",
@@ -226,7 +223,7 @@ def render_section(
             role_mix = (role_mix * vocalfx.stack_gain(len(specs))).astype(np.float32)
             role_mix, fx_log = vocalfx.apply_chain(role_mix, role.processing_json)
         role_key = f"{base_key}/r{ri}_{role.role_type}_stem.wav"
-        dsp.save_wav(storage.path_for(role_key), role_mix)
+        storage.save_wav(role_key, role_mix)
         chain_note = f" [{'+'.join(fx_log)}]" if fx_log else ""
         role_asset = _asset(
             asset_type="role_stem", file_path=role_key,
@@ -260,12 +257,12 @@ def render_section(
         bus = dsp.sum_stereo(mixes, n)
         bus_mixes.append(bus)
         key = f"{base_key}/{stem_type}.wav"
-        dsp.save_wav(storage.path_for(key), bus)
+        storage.save_wav(key, bus)
         _asset(asset_type=stem_type, file_path=key, label=stem_type.replace("_", " "))
 
     vocal_bus, _ = dsp.peak_normalize(dsp.sum_stereo(bus_mixes, n))
     vb_key = f"{base_key}/vocal_bus.wav"
-    dsp.save_wav(storage.path_for(vb_key), vocal_bus)
+    storage.save_wav(vb_key, vocal_bus)
     vb_asset = _asset(asset_type="vocal_bus", file_path=vb_key, label=f"all vocals ({mode})")
 
     ab = {
@@ -287,24 +284,24 @@ def render_section(
     )
     mix_parts = [vocal_bus]
     if instr is not None:
-        canonical = storage.path_for(f"{Path(instr.file_path).parent}/canonical.wav")
-        if canonical.exists():
-            ib = dsp.fit_length(dsp.load_stereo(canonical), n)
+        instr_key = f"{Path(instr.file_path).parent}/canonical.wav"
+        if storage.exists(instr_key):
+            ib = dsp.fit_length(storage.read_stereo(instr_key), n)
             mix_parts.append(ib)
             ik = f"{base_key}/stem_instrumental.wav"
-            dsp.save_wav(storage.path_for(ik), ib)
+            storage.save_wav(ik, ib)
             _asset(asset_type="stem_instrumental", file_path=ik, label="instrumental")
 
     mix, _ = dsp.peak_normalize(dsp.sum_stereo(mix_parts, n))
     mix_key = f"{base_key}/mix.wav"
-    dsp.save_wav(storage.path_for(mix_key), mix)
+    storage.save_wav(mix_key, mix)
     mix_asset = _asset(asset_type="mix", file_path=mix_key, label="section mix")
     vb_asset.parent_asset_id = mix_asset.id
 
     report_progress(db, job, 0.95, "mastering")
     master, _ = dsp.peak_normalize(dsp.gain_db(mix, 1.0), ceiling=0.95)
     master_key = f"{base_key}/master.wav"
-    dsp.save_wav(storage.path_for(master_key), master)
+    storage.save_wav(master_key, master)
     master_asset = _asset(asset_type="master", file_path=master_key, label="section master")
     mix_asset.parent_asset_id = master_asset.id
 

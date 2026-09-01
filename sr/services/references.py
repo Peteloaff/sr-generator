@@ -103,14 +103,13 @@ def import_folder(
 def analyze_reference(db: Session, ref: BandReference) -> BandReference:
     """Run analysis + quality on one reference (in-process, on the given session)."""
     storage = get_storage()
-    canonical = storage.path_for(
-        f"references/{ref.band_id}/catalogue/{ref.content_hash}/canonical.wav"
-    )
-    if not canonical.exists():
+    canonical_key = f"references/{ref.band_id}/catalogue/{ref.content_hash}/canonical.wav"
+    if not storage.exists(canonical_key):
         ref.analysis_status = "failed"
         ref.notes = (ref.notes or "") + " [canonical audio missing]"
         return ref
     try:
+        canonical = storage.ensure_local(canonical_key)
         provider = get_provider("analysis")
         result = provider.analyze(source_path=canonical)
         a = result.analysis

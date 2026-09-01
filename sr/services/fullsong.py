@@ -66,7 +66,7 @@ def _write_guide(
     stereo = np.stack([mono, mono], axis=1).astype(np.float32)
     base = f"references/{song.band_id}/{song.id}/{section.id}/guide"
     key_path = f"{base}/canonical.wav"
-    dsp.save_wav(storage.path_for(key_path), stereo, dsp.SR)
+    storage.save_wav(key_path, stereo, dsp.SR)
     for old in db.scalars(
         select(AudioAsset).where(
             AudioAsset.section_id == section.id, AudioAsset.asset_type == "guide_vocal"
@@ -96,7 +96,7 @@ def _section_piece(
     )
     if asset is None:
         return np.zeros((n, 2), dtype=np.float32)
-    return dsp.fit_length(dsp.load_stereo(get_storage().path_for(asset.file_path)), n)
+    return dsp.fit_length(get_storage().read_stereo(asset.file_path), n)
 
 
 def _concat(pieces: list[np.ndarray]) -> np.ndarray:
@@ -238,7 +238,7 @@ def generate_full_song(
         if master:
             arr, _ = dsp.peak_normalize(arr, ceiling=0.95)
         key = f"{base}/{asset_type}.wav"
-        dsp.save_wav(storage.path_for(key), arr, dsp.SR)
+        storage.save_wav(key, arr, dsp.SR)
         a = AudioAsset(
             song_id=song_id, generation_job_id=job.id, asset_type=asset_type,
             file_path=key, label=label, sample_rate=dsp.SR, channels=2,

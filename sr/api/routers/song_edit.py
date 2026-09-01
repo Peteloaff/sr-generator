@@ -105,7 +105,7 @@ def use_derived_stems(
         src = _latest_song_stem(db, song_id, stem_type)
         if src is None:
             continue
-        full = dsp.load_stereo(storage.path_for(src.file_path))
+        full = storage.read_stereo(src.file_path)
         s = int(section.start_time * dsp.SR)
         e = int(section.end_time * dsp.SR)
         clip = dsp.fit_length(full[s:e], max(1, e - s))
@@ -119,7 +119,7 @@ def use_derived_stems(
         db.flush()
 
         key = f"references/{section.song.band_id}/{song_id}/{section_id}/{folder}/canonical.wav"
-        dsp.save_wav(storage.path_for(key), clip, dsp.SR)
+        storage.save_wav(key, clip, dsp.SR)
         asset = AudioAsset(
             song_id=song_id, section_id=section_id, asset_type=section_type,
             file_path=key, parent_asset_id=src.id, sample_rate=dsp.SR, channels=2,

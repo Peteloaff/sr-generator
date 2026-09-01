@@ -284,9 +284,10 @@ def download_asset(
     asset = db.get(AudioAsset, asset_id)
     if asset is None or asset.song_id != song_id:
         raise HTTPException(404, "asset not found")
-    path = get_storage().path_for(asset.file_path)
-    if not path.exists():
+    storage = get_storage()
+    if not storage.exists(asset.file_path):
         raise HTTPException(410, "asset file is gone")
+    path = storage.ensure_local(asset.file_path)
     disposition = "inline" if inline else "attachment"
     name = f"{(asset.label or asset.asset_type).replace(' ', '_')}{Path(asset.file_path).suffix}"
     return FileResponse(
