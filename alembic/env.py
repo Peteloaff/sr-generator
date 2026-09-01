@@ -13,7 +13,10 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 _URL = config.get_main_option("sqlalchemy.url") or get_settings().database_url
-config.set_main_option("sqlalchemy.url", _URL)
+# configparser (which Alembic's config uses) treats '%' as interpolation syntax,
+# so a URL with a %-encoded password (e.g. '%40' for '@') has to be escaped as
+# '%%' here; engine_from_config reads it back and un-escapes it.
+config.set_main_option("sqlalchemy.url", _URL.replace("%", "%%"))
 target_metadata = Base.metadata
 # batch mode is only needed for SQLite's limited ALTER support; on Postgres it
 # would force table recreation, so keep it off there.
