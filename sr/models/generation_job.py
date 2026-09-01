@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, BigInteger, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from sr.models.base import Base, Timestamps, UUIDPrimaryKey
@@ -30,7 +30,7 @@ class GenerationJob(UUIDPrimaryKey, Timestamps, Base):
     status: Mapped[str] = mapped_column(String(20), default="queued", index=True)
     progress: Mapped[float] = mapped_column(Float, default=0.0)  # 0..1
 
-    seed: Mapped[int | None] = mapped_column(Integer, default=None)
+    seed: Mapped[int | None] = mapped_column(BigInteger, default=None)
     parameters_json: Mapped[dict | None] = mapped_column(JSON, default=None)
     result_json: Mapped[dict | None] = mapped_column(JSON, default=None)
     input_asset_ids: Mapped[list | None] = mapped_column(JSON, default=None)

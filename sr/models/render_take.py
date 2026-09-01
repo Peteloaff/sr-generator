@@ -8,7 +8,7 @@ a render can be reconstructed take-for-take from these rows.
 
 from __future__ import annotations
 
-from sqlalchemy import Float, ForeignKey, Integer, String
+from sqlalchemy import BigInteger, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from sr.models.base import Base, Timestamps, UUIDPrimaryKey
@@ -27,7 +27,7 @@ class RenderTake(UUIDPrimaryKey, Timestamps, Base):
         ForeignKey("singers.id", ondelete="CASCADE"), index=True
     )
     take_index: Mapped[int] = mapped_column(Integer)
-    child_seed: Mapped[int] = mapped_column(Integer)
+    child_seed: Mapped[int] = mapped_column(BigInteger)
 
     # Applied values = per-assignment fixed offset + bounded humanization jitter.
     timing_offset_ms: Mapped[float] = mapped_column(Float, default=0.0)

@@ -9,7 +9,16 @@ controls.
 
 from __future__ import annotations
 
-from sqlalchemy import JSON, CheckConstraint, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    JSON,
+    BigInteger,
+    CheckConstraint,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from sr.models.base import Base, Timestamps, UUIDPrimaryKey
@@ -76,7 +85,7 @@ class VocalAssignment(UUIDPrimaryKey, Timestamps, Base):
     timing_offset_ms: Mapped[float] = mapped_column(Float, default=0.0)
     formant_shift: Mapped[float] = mapped_column(Float, default=0.0)
     style: Mapped[str | None] = mapped_column(String(40), default=None)
-    seed: Mapped[int | None] = mapped_column(Integer, default=None)
+    seed: Mapped[int | None] = mapped_column(BigInteger, default=None)
 
     vocal_role: Mapped[VocalRole] = relationship(back_populates="assignments")
     singer: Mapped[Singer] = relationship(back_populates="assignments")  # noqa: F821

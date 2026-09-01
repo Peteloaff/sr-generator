@@ -7,7 +7,7 @@ sr/common/resolver.py for the inheritance rule).
 
 from __future__ import annotations
 
-from sqlalchemy import Boolean, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import BigInteger, Boolean, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from sr.models.base import Base, Timestamps, UUIDPrimaryKey
@@ -30,7 +30,7 @@ class Song(UUIDPrimaryKey, Timestamps, Base):
     prompt: Mapped[str | None] = mapped_column(Text, default=None)
     lyrics: Mapped[str | None] = mapped_column(Text, default=None)
     status: Mapped[str] = mapped_column(String(20), default="draft")
-    seed: Mapped[int | None] = mapped_column(Integer, default=None)
+    seed: Mapped[int | None] = mapped_column(BigInteger, default=None)
     reference_profile_id: Mapped[str | None] = mapped_column(
         ForeignKey("band_references.id", ondelete="SET NULL"), default=None
     )
@@ -61,7 +61,7 @@ class SongSection(UUIDPrimaryKey, Timestamps, Base):
     order_index: Mapped[int] = mapped_column(Integer, default=0)
     lyrics: Mapped[str | None] = mapped_column(Text, default=None)
     prompt_override: Mapped[str | None] = mapped_column(Text, default=None)
-    generation_seed: Mapped[int | None] = mapped_column(Integer, default=None)
+    generation_seed: Mapped[int | None] = mapped_column(BigInteger, default=None)
     # Stage 9: a locked section is protected from regeneration (surgical edits).
     locked: Mapped[bool] = mapped_column(Boolean, default=False)
 
