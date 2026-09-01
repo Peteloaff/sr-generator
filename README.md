@@ -6,13 +6,15 @@ deterministic, section- and line-level control over *which authorized singer
 performs each vocal part*, with weighted ensembles, harmonies, doubles, gang
 vocals, and screams.
 
-> **Status: Stage 7 (Band-Specific Music Generation) complete.** A band adapter
-> is distilled from the approved Band DNA, and the music provider renders a
-> deterministic, tempo/key-locked instrumental bed per section that band vocals
-> render over. The generator is a NumPy synth engine standing in for a real
-> model — `SR_MUSIC_PROVIDER=http` swaps it with no API change. Stages 1–6
-> (workspace, layering, voice conversion, stack quality, stem separation, Band
-> DNA) underneath. See [ROADMAP.md](ROADMAP.md).
+> **Status: Stages 0–11 complete — the full roadmap.** A prompt becomes a
+> structured, editable project: a deterministic song plan, a per-section
+> instrumental + guide melody, layered band vocals, and song stems + a master
+> (Stage 8). Any section, layer, or singer regenerates in isolation with a
+> revision history and rollback (Stage 9). The arranger recommends a complete,
+> editable vocal map from singer metadata and section energy without ever
+> clobbering manual work (Stage 10). Experimental singer-to-singer morphing lives
+> behind `SR_EXPERIMENTAL_MORPH` with an honest quality gate (Stage 11). Every
+> model remains a swappable provider. See [ROADMAP.md](ROADMAP.md).
 
 ## What you can do today
 
@@ -51,6 +53,21 @@ vocals, and screams.
   stems, a vocal bus, a section mix, and a master — players + WAV downloads +
   a take-by-take breakdown (`source: converted / upload / mock`). Same seed →
   identical bytes.
+- **Generate a whole song from a prompt**: "Compose → Generate song" builds the
+  structure, a default arrangement, a per-section instrumental + guide melody,
+  renders the band vocals, and produces song stems + a master. It's a normal
+  editable project, not one opaque file. Same seed → identical song master.
+- **Surgically regenerate**: lock the sections you like, then regenerate one
+  section, one layer (gang only, harmony only, …), or swap a single singer — the
+  other layers come out byte-identical. Every regeneration is a revision you can
+  **roll back**.
+- **Auto-arrange**: fill in each singer's preferred roles / range / energy fit,
+  then "Recommend arrangement" for a complete lead/double/harmony/gang map with
+  confidence and reasons. Apply skips sections that already have roles unless you
+  tick "replace".
+- **(Experimental) Vocal morph**: with `SR_EXPERIMENTAL_MORPH=true`, preview an
+  automated transition from one singer to another across a section; the preview
+  is quality-scored and an unreliable one can't be committed.
 - **Export / import a project** as portable JSON — carry an arrangement to
   another band; singers are matched by name.
 
@@ -92,14 +109,16 @@ npm run dev              # UI on http://localhost:3000
 
 ```
 sr/
-  api/          FastAPI app + routers (bands, singers, voice_models, songs, vocal, render, music, jobs)
+  api/          FastAPI app + routers (…, music, compose, regen, arranger, morph, jobs)
   models/       SQLAlchemy ORM (the core data model)
   schemas/      Pydantic request/response models
-  services/     layering, render, consent, cache, presets, separation, assembly, references, manifest, dna, quality, music
+  services/     layering, render, consent, cache, presets, separation, assembly, references,
+                manifest, dna, quality, music, songplan, fullsong, regen, arranger, morph
   providers/    ABCs + mock + local/http voice / stem / analysis / music providers + registry
   worker/       job queue backends, runner, handlers, progress, RQ entrypoint
   orchestrator/ generation pipeline definition (stubs for now)
-  common/       allocation, seeds, storage, resolver, audio, dsp, synth, voice, vocalfx, separation, analysis, musicgen
+  common/       allocation, seeds, storage, resolver, audio, dsp, synth, voice, vocalfx,
+                separation, analysis, musicgen, guide
 alembic/        migrations
 apps/web/       Next.js UI (band switcher, song workspace, Vocal Director)
 scripts/        setup / dev / worker / test / stage_gate

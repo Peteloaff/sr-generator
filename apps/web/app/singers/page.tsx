@@ -88,6 +88,63 @@ export default function SingersPage() {
                 <tr>
                   <td colSpan={4}>
                     <VoiceModelPanel singer={s} />
+                    <h4>Arranger metadata</h4>
+                    <p className="muted">
+                      User-entered, not measured. Feeds the Stage 10 auto arranger.
+                    </p>
+                    <div className="row">
+                      <label>
+                        preferred roles{" "}
+                        <input
+                          defaultValue={(s.preferred_roles ?? []).join(", ")}
+                          placeholder="chorus_lead, scream, high_harmony"
+                          style={{ width: 260 }}
+                          onBlur={(e) =>
+                            api
+                              .updateSinger(s.id, {
+                                preferred_roles: e.target.value
+                                  .split(",")
+                                  .map((x) => x.trim())
+                                  .filter(Boolean),
+                              })
+                              .then(refresh)
+                          }
+                        />
+                      </label>
+                      <label>
+                        energy fit{" "}
+                        <select
+                          defaultValue={s.energy_fit ?? ""}
+                          onChange={(e) =>
+                            api
+                              .updateSinger(s.id, { energy_fit: e.target.value || null })
+                              .then(refresh)
+                          }
+                        >
+                          <option value="">—</option>
+                          <option value="low">low</option>
+                          <option value="mid">mid</option>
+                          <option value="high">high</option>
+                        </select>
+                      </label>
+                      {(["range_low_midi", "range_high_midi"] as const).map((f) => (
+                        <label key={f}>
+                          {f === "range_low_midi" ? "range low" : "range high"} (MIDI){" "}
+                          <input
+                            type="number"
+                            defaultValue={s[f] ?? ""}
+                            style={{ width: 60 }}
+                            onBlur={(e) =>
+                              api
+                                .updateSinger(s.id, {
+                                  [f]: e.target.value === "" ? null : Number(e.target.value),
+                                })
+                                .then(refresh)
+                            }
+                          />
+                        </label>
+                      ))}
+                    </div>
                   </td>
                 </tr>
               )}

@@ -9,9 +9,11 @@ from sr.models.generation_job import GenerationJob
 from sr.models.project import Project
 from sr.models.render_cache import RenderCache
 from sr.models.render_take import RenderTake
+from sr.models.section_revision import SectionRevision
 from sr.models.singer import Singer
 from sr.models.song import LyricLine, Song, SongSection
 from sr.models.vocal import VocalAssignment, VocalRole
+from sr.models.vocal_morph import VocalMorph
 from sr.models.vocal_preset import VocalPreset
 
 __all__ = [
@@ -26,9 +28,11 @@ __all__ = [
     "VocalRole",
     "VocalAssignment",
     "VocalPreset",
+    "VocalMorph",
     "BandReference",
     "GenerationJob",
     "AudioAsset",
     "RenderTake",
     "RenderCache",
+    "SectionRevision",
 ]

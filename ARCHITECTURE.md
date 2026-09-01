@@ -122,6 +122,86 @@ on read: the 100%-scaled split (`normalize_weights`) and — for ensemble roles
 `largest_remainder_allocation`. Lead/double are always one take. The UI shows
 `Brian 70 → 7 takes` without ever mutating the stored weights.
 
+## Full song generation (Stage 8)
+
+```
+POST /songs/{id}/generate {prompt, lyrics?, seed, adapter_id?}   -> generate_song job
+  songplan.plan_song(prompt, lyrics, dna, seed)
+    -> structure template + per-section {type, bars, seconds, energy, key}
+    -> lyric-line distribution (provided text, or a seeded scaffold)
+  create SongSection + VocalRole/VocalAssignment (default arrangement) + LyricLine rows
+  for each section:
+      generate_instrumental(...)                 # Stage 7 - the section bed
+      guide.generate_guide(key, bpm, energy)     # a deterministic guide melody
+      render_section(...)                        # Stages 2-4 - band vocals over the bed
+  concatenate the section renders (short crossfades) ->
+      stem_instrumental / vocal_bus / song_mix / song_master   (section_id = NULL)
+```
+
+Every section, role, take, stem and the song master is its own `AudioAsset` with
+lineage. The planner and guide synth are deterministic, so the same seed yields
+the same project and the same `song_master` bytes. `GET /songs/{id}/plan` returns
+the plan without building anything.
+
+## Surgical regeneration (Stage 9)
+
+Section renders are already isolated - a render only writes its own section's
+assets - so "regenerate Chorus 1 without touching Verse 1" is free. Stage 9 adds
+the controls around it:
+
+- **`SongSection.locked`** - every `regenerate_*` route returns 423 for a locked
+  section; the arranger skips it.
+- **`regenerate_section`** - a fresh full render + a `SectionRevision` row.
+- **`regenerate_role`** - re-renders the section but passes
+  `role_seed_salt={role_id: new_seed}` to `render_section`; only that role's
+  `plan_role_takes` sees a new seed, so every other role's take/role stem is
+  **byte-identical**. An optional `swap_*_singer_id` changes the assignment first.
+- **`SectionRevision`** (kind / roles snapshot / render job / `is_current`) is the
+  undo log. `POST /sections/{id}/rollback {revision}` restores that revision's
+  role configuration.
+
+## Intelligent vocal arranger (Stage 10)
+
+`sr/services/arranger.py`, pure recommendation - it never writes unless
+`apply` is called explicitly.
+
+```
+GET /songs/{id}/arrangement/recommend
+  per section:
+    energy   = loudness of the section's instrumental bed  (fallback: section type)
+    density  = lyric characters / second
+    lead     = argmax over singers of (preferred_roles match + energy_fit + range fit)
+    +double / +harmony / +gang  from section family, energy, and singer preferences
+    -> each recommendation carries {confidence, rationale}
+
+POST /songs/{id}/arrangement/apply {section_ids?, overwrite?}
+  a section that already has roles, or is locked, is SKIPPED (listed in `skipped`)
+  unless overwrite=true.  Recommendations become ordinary VocalRoles - fully editable.
+```
+
+Singer metadata (`range_low_midi`, `range_high_midi`, `preferred_roles`,
+`energy_fit`) is user-entered, never claimed as measurement (blueprint §12).
+
+## Experimental vocal morph (Stage 11)
+
+Gated behind `SR_EXPERIMENTAL_MORPH` (default off). `GET /experimental` reports
+the flag; every other route 403s while it is off.
+
+```
+POST /sections/{id}/morphs {from_singer_id, to_singer_id, curve, start_frac, end_frac}
+POST /morphs/{id}/preview   -> morph_preview job (sr/services/morph.py)
+  a = _base_vocal(from_singer)   b = _base_vocal(to_singer)      # reuse the render engine
+  w = weight envelope (linear | equal_power | scurve) over [start_frac, end_frac]
+  mixed = a*(1-w) + b*w    (equal-power law for that curve)
+  quality:  envelope-correlation (poor_alignment), seam energy jump, gross level
+            -> score + usable
+  write a `morph_preview` AudioAsset ; store quality on the morph
+POST /morphs/{id}/commit   -> 409 if not usable ; sets `committed` (does NOT enter the mix)
+```
+
+The morph is preview + quality-gate only in this stage - the honest boundary for
+an R&D feature (blueprint §13, §17).
+
 ## Band-specific music generation (Stage 7)
 
 The approved Band DNA conditions a generated instrumental bed per section.

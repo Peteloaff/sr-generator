@@ -16,6 +16,7 @@ import Waveform, { sectionColor } from "@/components/Waveform";
 import VocalDirector from "@/components/VocalDirector";
 import SectionRender from "@/components/SectionRender";
 import CoverStudio from "@/components/CoverStudio";
+import ComposePanel from "@/components/ComposePanel";
 
 export default function SongWorkspace({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -124,6 +125,9 @@ export default function SongWorkspace({ params }: { params: Promise<{ id: string
         </>
       )}
 
+      <h2>Compose</h2>
+      <ComposePanel songId={id} singers={singers} onChange={loadAll} />
+
       <h2>Sections</h2>
       <table>
         <thead>
@@ -194,7 +198,12 @@ export default function SongWorkspace({ params }: { params: Promise<{ id: string
                 <tr>
                   <td colSpan={6}>
                     <VocalDirector scope="section" id={s.id} singers={singers} />
-                    <SectionRender songId={id} sectionId={s.id} singers={singers} />
+                    <SectionRender
+                      songId={id}
+                      section={s}
+                      singers={singers}
+                      onChange={loadAll}
+                    />
                   </td>
                 </tr>
               )}

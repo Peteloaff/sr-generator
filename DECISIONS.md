@@ -396,3 +396,90 @@ identical.
 is traceable to an exact dataset. The distilled priors are coarse - a real model
 would learn far more from the same manifest - but the identity, storage,
 selection UI and generation-conditioning path are already in place for it.
+
+---
+
+## ADR-0024 — Full-song generation is a planner over the existing engine, not an end-to-end model
+
+**Context.** Blueprint Stage 8: "prompt → lyrics → structure → section music →
+guide melody → vocals → mix". A single generative model that does all of that
+would bypass the Vocal Director, the stems, and section-level editing - exactly
+what the blueprint's scope rules forbid ("Never make the final output a single
+opaque audio file").
+
+**Decision.** `generate_full_song` is an orchestrator. `songplan.plan_song`
+deterministically chooses a structure template and per-section parameters; the
+job then drives the *already-built* pieces - `generate_instrumental` (Stage 7),
+a deterministic guide melody (`sr/common/guide.py`), and `render_section`
+(Stages 2-4) - and concatenates the section renders into song-level stems + a
+master. Lyrics are either the user's text or a clearly-labelled seeded scaffold;
+real lyric generation is a language-model concern left to a future provider.
+
+**Consequences.** The output is a normal editable project: every section, role,
+take and stem is a first-class `AudioAsset`, and Stage 9 can regenerate any one
+of them. The planner is coarse (a handful of templates, energy by section type)
+but the seams for a smarter planner or a real music model are the same provider
+and service boundaries used everywhere else. Same seed → same project.
+
+---
+
+## ADR-0025 — Role regeneration perturbs only that role's plan seed
+
+**Context.** Stage 9 wants "regenerate one layer only" with the other layers
+provably unchanged. Re-rendering the whole section is simplest, but naively it
+would reroll every role's humanisation.
+
+**Decision.** `render_section` takes `role_seed_salt = {role_id: seed}`. A role in
+the map plans its takes from `derive_seed(seed, "reroll", salt)`; every other role
+plans from the unchanged section seed. Because the layering engine is
+deterministic, the untouched roles produce byte-identical take and role stems -
+verified by hashing them across the regeneration. A singer swap changes the
+assignment row first, then salts that role.
+
+**Consequences.** "Regenerate the gang, keep the lead" is exact, not
+approximate, and needs no diffing or partial-asset surgery. `SectionRevision`
+snapshots the role config each time so a regeneration (or a swap) can be rolled
+back.
+
+---
+
+## ADR-0026 — Arranger metadata is user-entered; apply never overwrites silently
+
+**Context.** Blueprint §12: singer performance characteristics "should initially
+be user-entered metadata, not automatically claimed as objective measurements".
+§16 Stage 10: "never overwrites user assignments without an explicit action".
+
+**Decision.** `Singer` gains `range_low_midi` / `range_high_midi` /
+`preferred_roles` / `energy_fit` - all optional, all user-set. The arranger
+scores recommendations from those plus section energy (measured from the
+instrumental bed) and lyric density, and every recommendation ships a
+`confidence` and a `rationale` string. `recommend` mutates nothing. `apply`
+**skips** any section that already has roles, or is locked, listing it in
+`skipped`; replacing existing roles requires `overwrite: true`.
+
+**Consequences.** The arranger is a suggestion surface, not an authority. A band
+with no metadata still gets a complete map (round-robin leads, low confidence).
+Applied recommendations are ordinary `VocalRole`s - immediately editable.
+
+---
+
+## ADR-0027 — Vocal morph is flag-gated, preview-only, and quality-gated
+
+**Context.** Blueprint §13/§16/§17: timbre blending is "a later R&D feature, not
+an MVP requirement" and must stay "behind an experimental flag" until "technically
+reliable and legally/consent compatible".
+
+**Decision.** The whole feature is off unless `SR_EXPERIMENTAL_MORPH=true`; every
+route 403s otherwise, and `GET /experimental` lets the UI hide the lane. A morph
+renders a **preview only** - a time-varying crossfade between two singers'
+section vocals - and is scored: envelope correlation between the two performances
+(`poor_alignment`), seam energy jump, gross level. A morph that scores below
+`0.6` or trips `poor_alignment` is marked `usable: false` and `commit` returns
+409. Committing sets a flag; it does not splice the morph into any mix in this
+stage. Both singers must have `consent_generation`.
+
+**Consequences.** The honest state of the art in this repo (deterministic DSP,
+no timbre-interpolation model) is a crossfade, and the quality gate says so out
+loud rather than shipping a bad blend. When a real morphing provider lands it
+implements the same preview + score contract, and the commit path can then be
+extended to feed the section mix.

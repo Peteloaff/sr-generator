@@ -123,6 +123,13 @@ zip of named WAV stems (`vocals.wav`, `drums.wav`, …). Set
 - **Singing voice:** RVC / so-vits-svc / DiffSinger-class, per authorized singer,
   behind the `analyze`/`convert` contract above.
 - **Stem separation:** a Demucs-class separator.
+- **Lyrics / guide melody (Stage 8):** the song planner writes a seeded lyric
+  scaffold and a deterministic guide melody today; a language model and a
+  melody/vocal model would slot in at `songplan` / `sr/common/guide.py` without
+  changing the full-song job or the resulting project shape.
+- **Vocal morph (Stage 11):** a real timbre-interpolation model implements the
+  same preview + quality-score contract in `sr/services/morph.py`; it stays
+  behind `SR_EXPERIMENTAL_MORPH` until its scores are reliably high.
 
 Every selection is an *implementation provider*, never a permanent product
 dependency.

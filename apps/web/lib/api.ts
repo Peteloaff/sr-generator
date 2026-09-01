@@ -57,6 +57,8 @@ export interface Singer {
   clean_enabled: boolean; scream_enabled: boolean;
   consent_training: boolean; consent_generation: boolean; consent_commercial: boolean;
   training_status: string;
+  range_low_midi: number | null; range_high_midi: number | null;
+  preferred_roles: string[] | null; energy_fit: string | null;
 }
 export interface VoiceProfile {
   median_f0?: number; formant_semitones?: number; brightness?: number;
@@ -74,6 +76,28 @@ export interface Project { id: string; band_id: string; name: string; descriptio
 export interface Section {
   id: string; song_id: string; section_type: string; name: string | null;
   start_time: number | null; end_time: number | null; order_index: number;
+  locked: boolean;
+}
+export interface SectionRevision {
+  id: string; revision: number; kind: string; render_job_id: string | null;
+  changed_role_id: string | null; note: string | null; is_current: boolean;
+  roles: number; created_at: string;
+}
+export interface RoleRecommendation {
+  role_type: string; ensemble_size: number; width: number;
+  assignments: { singer_id: string; weight_percent: number; interval_semitones?: number }[];
+  confidence: number; rationale: string;
+}
+export interface SectionArrangement {
+  section_id: string; section_type: string; name: string | null; locked: boolean;
+  energy: number; energy_band: string; lyric_density: number; has_roles: boolean;
+  recommendations: RoleRecommendation[];
+}
+export interface Morph {
+  id: string; section_id: string; from_singer_id: string; to_singer_id: string;
+  curve: string; start_frac: number; end_frac: number;
+  quality: { score: number; flags: string[]; usable: boolean } | null;
+  preview_asset_id: string | null; committed: boolean;
 }
 export interface LyricLine {
   id: string; song_id: string; section_id: string | null; order_index: number;
@@ -267,6 +291,84 @@ export const api = {
     }),
   listGenerations: (songId: string, sectionId: string) =>
     req<Job[]>(`/songs/${songId}/sections/${sectionId}/generations`),
+
+  // Stage 8 - full song generator
+  previewPlan: (songId: string, prompt: string, seed = 0) =>
+    req<Record<string, unknown>>(
+      `/songs/${songId}/plan?prompt=${encodeURIComponent(prompt)}&seed=${seed}`,
+    ),
+  generateFullSong: (
+    songId: string,
+    body: { prompt?: string; lyrics?: string; seed?: number; adapter_id?: string },
+  ) =>
+    req<Job>(`/songs/${songId}/generate`, { method: "POST", body: JSON.stringify(body) }),
+  listFullSongJobs: (songId: string) => req<Job[]>(`/songs/${songId}/generations`),
+
+  // Stage 9 - surgical regeneration
+  lockSection: (sectionId: string, locked: boolean) =>
+    req<{ section_id: string; locked: boolean }>(
+      `/sections/${sectionId}/lock?locked=${locked}`,
+      { method: "POST" },
+    ),
+  regenerateSection: (sectionId: string, body: { seed?: number; note?: string } = {}) =>
+    req<Job>(`/sections/${sectionId}/regenerate`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  regenerateRole: (
+    roleId: string,
+    body: {
+      seed?: number;
+      swap_from_singer_id?: string;
+      swap_to_singer_id?: string;
+      note?: string;
+    } = {},
+  ) =>
+    req<Job>(`/roles/${roleId}/regenerate`, { method: "POST", body: JSON.stringify(body) }),
+  listRevisions: (sectionId: string) =>
+    req<SectionRevision[]>(`/sections/${sectionId}/revisions`),
+  rollbackSection: (sectionId: string, revision: number) =>
+    req<VocalRole[]>(`/sections/${sectionId}/rollback`, {
+      method: "POST",
+      body: JSON.stringify({ revision }),
+    }),
+
+  // Stage 10 - intelligent vocal arranger
+  recommendArrangement: (songId: string, seed = 0) =>
+    req<{ sections: SectionArrangement[]; singers_considered: string[] }>(
+      `/songs/${songId}/arrangement/recommend?seed=${seed}`,
+    ),
+  applyArrangement: (
+    songId: string,
+    body: { section_ids?: string[]; overwrite?: boolean } = {},
+  ) =>
+    req<{ applied: { section_id: string; roles: number }[]; skipped: { section_id: string; reason: string }[] }>(
+      `/songs/${songId}/arrangement/apply`,
+      { method: "POST", body: JSON.stringify(body) },
+    ),
+
+  // Stage 11 - experimental vocal morph
+  experimentalStatus: () => req<{ morph_enabled: boolean }>(`/experimental`),
+  listMorphs: (sectionId: string) => req<Morph[]>(`/sections/${sectionId}/morphs`),
+  createMorph: (
+    sectionId: string,
+    body: {
+      from_singer_id: string;
+      to_singer_id: string;
+      curve?: string;
+      start_frac?: number;
+      end_frac?: number;
+    },
+  ) =>
+    req<Morph>(`/sections/${sectionId}/morphs`, {
+      method: "POST",
+      body: JSON.stringify({ section_id: sectionId, ...body }),
+    }),
+  previewMorph: (morphId: string) =>
+    req<Job>(`/morphs/${morphId}/preview`, { method: "POST", body: "{}" }),
+  commitMorph: (morphId: string) =>
+    req<Morph>(`/morphs/${morphId}/commit`, { method: "POST" }),
+  deleteMorph: (morphId: string) => req<void>(`/morphs/${morphId}`, { method: "DELETE" }),
 
   separateStems: (songId: string) =>
     req<Job>(`/songs/${songId}/separate`, { method: "POST" }),

@@ -61,6 +61,10 @@ class JobType(StrEnum):
     MASTER = "master"
     TRAIN_SINGER = "train_singer"
     TRAIN_BAND_ADAPTER = "train_band_adapter"
+    GENERATE_SONG = "generate_song"
+    REGENERATE_SECTION = "regenerate_section"
+    REGENERATE_ROLE = "regenerate_role"
+    MORPH_PREVIEW = "morph_preview"
 
 
 class JobStatus(StrEnum):
@@ -94,7 +98,9 @@ class AssetType(StrEnum):
     MIX = "mix"
     MASTER = "master"
     SONG_MIX = "song_mix"  # full-song assembly (original mix + replaced sections)
+    SONG_MASTER = "song_master"  # full-song generated master (Stage 8)
     GENERATED_INSTRUMENTAL = "generated_instrumental"  # music-model output for a section
+    MORPH_PREVIEW = "morph_preview"  # experimental vocal-morph render (Stage 11)
     PROJECT_STATE = "project_state"
     OTHER = "other"
 

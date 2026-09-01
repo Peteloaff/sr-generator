@@ -9,7 +9,10 @@ import {
   type AudioAsset,
   type BandAdapter,
   type Job,
+  type Morph,
   type RenderTake,
+  type Section,
+  type SectionRevision,
   type Singer,
   type VocalPreset,
   type VocalRole,
@@ -28,13 +31,16 @@ function stemRank(t: string) {
 
 export default function SectionRender({
   songId,
-  sectionId,
+  section,
   singers,
+  onChange,
 }: {
   songId: string;
-  sectionId: string;
+  section: Section;
   singers: Singer[];
+  onChange?: () => void;
 }) {
+  const sectionId = section.id;
   const [takes, setTakes] = useState<AudioAsset[]>([]);
   const [renders, setRenders] = useState<Job[]>([]);
   const [takeRows, setTakeRows] = useState<RenderTake[]>([]);
@@ -45,6 +51,9 @@ export default function SectionRender({
   const [adapters, setAdapters] = useState<BandAdapter[]>([]);
   const [generations, setGenerations] = useState<Job[]>([]);
   const [adapterId, setAdapterId] = useState<string>("");
+  const [revisions, setRevisions] = useState<SectionRevision[]>([]);
+  const [morphEnabled, setMorphEnabled] = useState(false);
+  const [morphs, setMorphs] = useState<Morph[]>([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -57,7 +66,7 @@ export default function SectionRender({
 
   const load = useCallback(async () => {
     const bandId = getBandId() ?? (await api.listBands())[0]?.id ?? null;
-    const [t, r, rl, sa, pr, g, ad] = await Promise.all([
+    const [t, r, rl, sa, pr, g, ad, rev, exp] = await Promise.all([
       api.listSourceTakes(songId, sectionId),
       api.listSectionRenders(songId, sectionId),
       api.sectionRoles(sectionId),
@@ -65,6 +74,8 @@ export default function SectionRender({
       api.listPresets(),
       api.listGenerations(songId, sectionId),
       bandId ? api.listAdapters(bandId) : Promise.resolve([] as BandAdapter[]),
+      api.listRevisions(sectionId),
+      api.experimentalStatus(),
     ]);
     setTakes(t);
     setRenders(r);
@@ -72,6 +83,9 @@ export default function SectionRender({
     setPresets(pr);
     setGenerations(g);
     setAdapters(ad);
+    setRevisions(rev);
+    setMorphEnabled(exp.morph_enabled);
+    setMorphs(exp.morph_enabled ? await api.listMorphs(sectionId) : []);
     setGuide(
       sa.find((a) => a.asset_type === "guide_vocal" && a.section_id === sectionId) ?? null,
     );
@@ -183,10 +197,108 @@ export default function SectionRender({
   };
 
   const lastGen = generations[0];
+  const refresh = async () => {
+    await load();
+    onChange?.();
+  };
+
+  const runJob = async (tag: string, mk: () => Promise<Job>) => {
+    setBusy(true);
+    setErr(null);
+    try {
+      const job = await mk();
+      const done = await api.waitJob(job.id);
+      if (done.status !== "succeeded") setErr(done.error || `${tag} failed`);
+      await refresh();
+    } catch (e) {
+      setErr(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggleLock = async () => {
+    setErr(null);
+    try {
+      await api.lockSection(sectionId, !section.locked);
+      await refresh();
+    } catch (e) {
+      setErr(String(e));
+    }
+  };
+
+  const rollback = async (revision: number) => {
+    setErr(null);
+    try {
+      await api.rollbackSection(sectionId, revision);
+      await refresh();
+    } catch (e) {
+      setErr(String(e));
+    }
+  };
 
   return (
     <div className="section-render">
       {err && <p className="danger">{err}</p>}
+
+      <h4>Surgical regeneration</h4>
+      <div className="row">
+        <label>
+          <input type="checkbox" checked={section.locked} onChange={toggleLock} /> locked
+        </label>
+        <button
+          disabled={busy || section.locked}
+          onClick={() => runJob("regenerate", () => api.regenerateSection(sectionId))}
+        >
+          {busy ? "working…" : "Regenerate section"}
+        </button>
+        {revisions[0] && (
+          <span className="muted">
+            revision {revisions[0].revision} ({revisions[0].kind})
+          </span>
+        )}
+      </div>
+      {roles.length > 0 && (
+        <div className="row">
+          <span className="muted">regenerate one layer:</span>
+          {roles.map((r) => (
+            <button
+              key={r.id}
+              disabled={busy || section.locked}
+              onClick={() => runJob("role", () => api.regenerateRole(r.id))}
+            >
+              {r.role_type}
+            </button>
+          ))}
+        </div>
+      )}
+      {revisions.length > 1 && (
+        <div className="row">
+          <span className="muted">rollback to:</span>
+          {revisions
+            .slice()
+            .reverse()
+            .map((rev) => (
+              <button
+                key={rev.id}
+                disabled={busy || section.locked || rev.is_current}
+                onClick={() => rollback(rev.revision)}
+              >
+                r{rev.revision}
+              </button>
+            ))}
+        </div>
+      )}
+
+      {morphEnabled && (
+        <MorphLane
+          sectionId={sectionId}
+          songId={songId}
+          singers={singersInSection}
+          morphs={morphs}
+          onChange={refresh}
+        />
+      )}
 
       <h4>Guide vocal</h4>
       <p className="muted">
@@ -410,5 +522,124 @@ export default function SectionRender({
         </>
       )}
     </div>
+  );
+}
+
+function MorphLane({
+  sectionId,
+  songId,
+  singers,
+  morphs,
+  onChange,
+}: {
+  sectionId: string;
+  songId: string;
+  singers: Singer[];
+  morphs: Morph[];
+  onChange: () => void;
+}) {
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const nameOf = (id: string) => singers.find((s) => s.id === id)?.name ?? id.slice(0, 6);
+
+  const wrap = async (fn: () => Promise<void>) => {
+    setBusy(true);
+    setErr(null);
+    try {
+      await fn();
+      onChange();
+    } catch (e) {
+      setErr(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <details style={{ marginTop: 8 }}>
+      <summary>Vocal morph (experimental)</summary>
+      <p className="muted">
+        Automates a transition from one singer identity to another across the
+        section. Preview-only: a morph flagged unreliable cannot be committed.
+      </p>
+      {err && <p className="danger">{err}</p>}
+      <div className="row">
+        <select value={from} onChange={(e) => setFrom(e.target.value)}>
+          <option value="">from…</option>
+          {singers.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+        <select value={to} onChange={(e) => setTo(e.target.value)}>
+          <option value="">to…</option>
+          {singers.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+        <button
+          disabled={busy || !from || !to || from === to}
+          onClick={() =>
+            wrap(async () => {
+              await api.createMorph(sectionId, { from_singer_id: from, to_singer_id: to });
+            })
+          }
+        >
+          add morph
+        </button>
+      </div>
+      {morphs.map((m) => (
+        <div key={m.id} className="row">
+          <span>
+            {nameOf(m.from_singer_id)} → {nameOf(m.to_singer_id)} ({m.curve})
+          </span>
+          <button
+            disabled={busy}
+            onClick={() =>
+              wrap(async () => {
+                const j = await api.previewMorph(m.id);
+                await api.waitJob(j.id);
+              })
+            }
+          >
+            preview
+          </button>
+          {m.quality && (
+            <span className={m.quality.usable ? "muted" : "danger"}>
+              score {m.quality.score} {m.quality.flags.join(",") || "clean"}
+              {m.quality.usable ? "" : " — not committable"}
+            </span>
+          )}
+          {m.preview_asset_id && (
+            <audio
+              controls
+              preload="none"
+              src={assetUrl(songId, m.preview_asset_id, { inline: true })}
+            />
+          )}
+          {m.quality?.usable && !m.committed && (
+            <button
+              disabled={busy}
+              onClick={() => wrap(async () => void (await api.commitMorph(m.id)))}
+            >
+              commit
+            </button>
+          )}
+          {m.committed && <span className="pill">committed</span>}
+          <button
+            className="danger"
+            disabled={busy}
+            onClick={() => wrap(async () => await api.deleteMorph(m.id))}
+          >
+            delete
+          </button>
+        </div>
+      ))}
+    </details>
   );
 }

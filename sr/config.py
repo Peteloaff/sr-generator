@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     default_seed: int = 1337
     api_cors_origins: str = "http://localhost:3000"
 
+    # Stage 11: vocal morph / timbre blend is experimental and off by default.
+    experimental_morph: bool = False
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.api_cors_origins.split(",") if o.strip()]

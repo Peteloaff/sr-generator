@@ -173,39 +173,80 @@ change (see MODEL_SETUP.md). Text-prompt full-song generation is Stage 8.
 
 ---
 
-## [ ] Stage 8 — Full Song Generator
+## [x] Stage 8 — Full Song Generator
 
-- [ ] prompt → lyrics → structure planner → section music → guide melody → vocals → mix → export
-- [ ] wired into existing sections + Vocal Director
+- [x] deterministic **song planner** (`sr/services/songplan.py`): prompt (+ optional
+      lyrics + Band DNA + seed) → structure template, per-section bars / seconds /
+      energy / key, lyric-line distribution, and a default vocal arrangement
+- [x] **`generate_full_song`** job — creates the sections, roles and lyric lines,
+      then per section: a generated instrumental bed (Stage 7), a deterministic
+      **guide melody** (`sr/common/guide.py`), and a full layering-engine render
+      (Stages 2–4); concatenates the section renders into song-level
+      `stem_instrumental` / `vocal_bus` / `song_mix` / `song_master`
+- [x] `POST /songs/{id}/generate`, `GET /songs/{id}/plan` (dry run), wired into
+      the existing section + Vocal Director machinery
+- [x] web: "Full song generator" panel on the song page
 
 **Exit criteria** — generate a complete project with independently editable
-sections and singer assignments; output is never a single opaque file.
+sections and singer assignments; output is never a single opaque file. **All
+PASS** (`python scripts/stage_gate.py 8`). Every section, role, take, stem and the
+song master is a separate `AudioAsset`; a single section re-renders on its own
+without touching the others.
 
 ---
 
-## [ ] Stage 9 — Surgical Regeneration
+## [x] Stage 9 — Surgical Regeneration
 
-- [ ] regenerate chorus only / one layer only / swap singer only
-- [ ] preserve timing + project context; asset versioning; undo/rollback
+- [x] `SongSection.locked` + `SectionRevision` history (kind / roles snapshot /
+      render job / `is_current`)
+- [x] `POST /sections/{id}/regenerate` — full section re-render, new revision, the
+      rest of the song untouched (section renders were already isolated)
+- [x] `POST /roles/{id}/regenerate` — re-renders the section but perturbs **only**
+      that role's plan seed (`role_seed_salt`), so every other role's stem comes
+      out byte-identical; optional single-role **singer swap**
+- [x] `GET /sections/{id}/revisions`, `POST /sections/{id}/rollback`,
+      `POST /sections/{id}/lock`
+- [x] web: "Surgical regeneration" controls in the section panel
 
 **Exit criteria** — change one role or section without materially altering locked
-sections.
+sections. **All PASS** (`python scripts/stage_gate.py 9`).
 
 ---
 
-## [ ] Stage 10 — Intelligent Vocal Arranger
+## [x] Stage 10 — Intelligent Vocal Arranger
 
-- [ ] singer preference/range metadata; section-energy analysis
-- [ ] recommended roles + confidence; one-click apply; manual override
+- [x] singer metadata: `range_low_midi` / `range_high_midi` / `preferred_roles` /
+      `energy_fit` (user-entered, not measured)
+- [x] section-energy analysis (`sr/services/arranger.py`) from the section's
+      instrumental bed loudness, with a section-type fallback; lyric density
+- [x] `GET /songs/{id}/arrangement/recommend` — lead / double / harmony /
+      background / gang recommendations per section, each with a `confidence` and
+      a plain-text `rationale`
+- [x] `POST /songs/{id}/arrangement/apply` — **skips** any section that already has
+      roles (or is locked) unless `overwrite: true` is passed
+- [x] web: "Auto arranger" panel (recommend table + apply with an explicit
+      replace checkbox)
 
 **Exit criteria** — recommendation produces a complete editable vocal map and
-never overwrites user assignments without an explicit action.
+never overwrites user assignments without an explicit action. **All PASS**
+(`python scripts/stage_gate.py 10`).
 
 ---
 
-## [ ] Stage 11 — Experimental Vocal Morph / Timbre R&D
+## [x] Stage 11 — Experimental Vocal Morph / Timbre R&D
 
-- [ ] morph automation lane; provider experiments; quality flags; render previews
+- [x] whole feature gated behind `SR_EXPERIMENTAL_MORPH` (off by default); every
+      endpoint 403s when disabled; `GET /experimental` probe for the UI
+- [x] `VocalMorph` + `POST /morphs/{id}/preview` — a time-varying crossfade
+      (`linear` / `equal_power` / `scurve`) between two singers' section vocals,
+      rendered as a **preview only**
+- [x] quality flags (`sr/services/morph.py`): envelope-correlation
+      (`poor_alignment`), seam energy jump, gross level — a low score marks the
+      morph `usable: false`
+- [x] `POST /morphs/{id}/commit` refuses an unusable morph (409)
+- [x] web: "Vocal morph (experimental)" lane, shown only when the flag is on
 
 **Exit criteria** — enabled only when technically reliable and consent
-compatible; otherwise stays behind an experimental flag.
+compatible; otherwise stays behind an experimental flag. **All PASS**
+(`python scripts/stage_gate.py 11`). The morph never enters a section mix in this
+stage — it is deliberately preview + quality-gate only.

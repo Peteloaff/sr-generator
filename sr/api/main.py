@@ -9,13 +9,17 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from sr import __version__
 from sr.api.routers import (
+    arranger,
     bands,
+    compose,
     health,
     jobs,
+    morph,
     music,
     presets,
     projects,
     references,
+    regen,
     render,
     singers,
     song_edit,
@@ -58,7 +62,8 @@ def create_app() -> FastAPI:
 
     for module in (
         health, bands, singers, voice_models, references, projects, songs,
-        vocal, presets, render, song_edit, music, jobs,
+        vocal, presets, render, song_edit, music, compose, regen, arranger,
+        morph, jobs,
     ):
         app.include_router(module.router)
 

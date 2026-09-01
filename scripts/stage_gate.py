@@ -695,15 +695,316 @@ def stage7(client) -> list[Row]:
     return rows
 
 
+def _consenting_band(client) -> tuple[str, dict]:
+    band = client.get("/bands").json()[0]["id"]
+    ids = {}
+    for name, f0 in (("Brian", 120.0), ("Pete", 185.0), ("Brad", 150.0)):
+        sid = client.post("/singers", json={"name": name}).json()["id"]
+        client.patch(f"/singers/{sid}", json={"consent_generation": True})
+        client.patch(f"/singers/{sid}/voice-model", json={"median_f0": f0})
+        ids[name] = sid
+    return band, ids
+
+
+def stage8(client) -> list[Row]:
+    import hashlib
+
+    rows: list[Row] = []
+    _consenting_band(client)
+    try:
+        song = client.post("/songs", json={"title": "Gate Full Song"}).json()["id"]
+        job = client.post(
+            f"/songs/{song}/generate", json={"prompt": "a driving night anthem", "seed": 31}
+        ).json()
+        job = client.post(f"/jobs/{job['id']}/wait", params={"timeout": 120}).json()
+        sections = client.get(f"/songs/{song}/sections").json()
+        ok = job["status"] == "succeeded" and len(sections) >= 5
+        rows.append(("Prompt -> multi-section song project", ok, f"{len(sections)} sections"))
+
+        vocal_sections = [s for s in sections if s["section_type"] in ("verse", "chorus")]
+        assigned = all(
+            any(r["assignments"] for r in client.get(f"/sections/{s['id']}/roles").json())
+            for s in vocal_sections
+        )
+        rows.append(("Every verse/chorus has singer assignments", assigned,
+                     f"{len(vocal_sections)} sections"))
+
+        assets = client.get(f"/songs/{song}/assets").json()
+        kinds = {a["asset_type"] for a in assets}
+        need = {"song_mix", "song_master", "stem_instrumental", "vocal_bus",
+                "instrumental_bed", "guide_vocal", "mix", "master", "take_stem"}
+        rows.append(("Editable stems + master, not one opaque file",
+                     need <= kinds and len(assets) > 15,
+                     f"{len(kinds & need)}/{len(need)} kinds, {len(assets)} assets"))
+
+        target = next(s for s in sections if s["section_type"] == "chorus")
+        other = next(s for s in vocal_sections if s["id"] != target["id"])
+
+        def master_sha(sid, exclude=frozenset()):
+            ms = [a for a in client.get(f"/songs/{song}/assets").json()
+                  if a["section_id"] == sid and a["asset_type"] == "master"
+                  and a["id"] not in exclude]
+            blob = client.get(f"/songs/{song}/assets/{ms[-1]['id']}/download").content
+            return ms[-1]["id"], hashlib.sha256(blob).hexdigest()
+
+        oid, before_other = master_sha(other["id"])
+        tid, _ = master_sha(target["id"])
+        rj = client.post(
+            f"/songs/{song}/sections/{target['id']}/render", json={"seed": 909}
+        ).json()
+        client.post(f"/jobs/{rj['id']}/wait", params={"timeout": 90})
+        _, after_other = master_sha(other["id"])
+        _, after_target = master_sha(target["id"], exclude={tid})
+        rows.append(("Regenerate one section, rest untouched",
+                     after_other == before_other, "other section byte-identical"))
+    except Exception as exc:  # noqa: BLE001
+        rows.append(("Full song generator", False, repr(exc)))
+
+    return rows
+
+
+def stage9(client) -> list[Row]:
+    import hashlib
+
+    rows: list[Row] = []
+    _, ids = _consenting_band(client)
+    song = client.post("/songs", json={"title": "Gate S9", "seed": 4, "bpm": 120}).json()["id"]
+    secs = []
+    for stype in ("verse", "chorus"):
+        sec = client.post(
+            f"/songs/{song}/sections",
+            json={"section_type": stype, "start_time": 0, "end_time": 4},
+        ).json()["id"]
+        client.post(f"/sections/{sec}/roles",
+                    json={"role_type": "lead", "assignments": [{"singer_id": ids["Brian"]}]})
+        client.post(f"/sections/{sec}/roles", json={
+            "role_type": "gang", "ensemble_size": 6, "width": 70,
+            "humanize_timing_ms": 20, "humanize_pitch_cents": 8,
+            "assignments": [
+                {"singer_id": ids["Brian"], "weight_percent": 50},
+                {"singer_id": ids["Pete"], "weight_percent": 30},
+                {"singer_id": ids["Brad"], "weight_percent": 20},
+            ],
+        })
+        j = client.post(f"/songs/{song}/sections/{sec}/render", json={}).json()
+        client.post(f"/jobs/{j['id']}/wait", params={"timeout": 90})
+        secs.append(sec)
+    verse, chorus = secs
+
+    def assets():
+        return client.get(f"/songs/{song}/assets").json()
+
+    def sha(aid):
+        blob = client.get(f"/songs/{song}/assets/{aid}/download").content
+        return hashlib.sha256(blob).hexdigest()
+
+    def role_stems(sid, prefix, exclude=frozenset()):
+        return [a["id"] for a in assets()
+                if a["section_id"] == sid and a["asset_type"] == "role_stem"
+                and (a["label"] or "").startswith(prefix) and a["id"] not in exclude]
+
+    def run(job):
+        return client.post(f"/jobs/{job['id']}/wait", params={"timeout": 90}).json()
+
+    try:
+        verse_master = next(a["id"] for a in assets()
+                            if a["section_id"] == verse and a["asset_type"] == "master")
+        before = sha(verse_master)
+        job = run(client.post(f"/sections/{chorus}/regenerate", json={"seed": 555}).json())
+        rows.append(("Regenerate a section (isolated)",
+                     job["status"] == "succeeded" and sha(verse_master) == before,
+                     "verse master identical"))
+
+        lead_before = set(role_stems(verse, "lead"))
+        gang_before = set(role_stems(verse, "gang"))
+        lead_sha = sha(next(iter(lead_before)))
+        gang_role = next(r for r in client.get(f"/sections/{verse}/roles").json()
+                         if r["role_type"] == "gang")
+        run(client.post(f"/roles/{gang_role['id']}/regenerate", json={"seed": 4}).json())
+        lead_after = next(iter(set(role_stems(verse, "lead")) - lead_before))
+        gang_after = next(iter(set(role_stems(verse, "gang")) - gang_before))
+        gang_before_sha = sha(next(iter(gang_before)))
+        rows.append(("Regenerate one role, other layers byte-identical",
+                     sha(lead_after) == lead_sha and sha(gang_after) != gang_before_sha,
+                     "lead layer preserved"))
+
+        lead_role = next(r for r in client.get(f"/sections/{verse}/roles").json()
+                         if r["role_type"] == "lead")
+        sw = run(client.post(f"/roles/{lead_role['id']}/regenerate", json={
+            "swap_from_singer_id": ids["Brian"], "swap_to_singer_id": ids["Pete"]}).json())
+        new_lead = client.get(f"/sections/{verse}/roles").json()
+        swapped = next(r for r in new_lead if r["role_type"] == "lead")
+        rows.append(("Swap a singer only",
+                     sw["result_json"]["regen"] == "swap"
+                     and swapped["assignments"][0]["singer_id"] == ids["Pete"], "singer swapped"))
+
+        client.post(f"/sections/{chorus}/lock", params={"locked": True})
+        r = client.post(f"/sections/{chorus}/regenerate", json={})
+        rows.append(("Locked section refuses regeneration",
+                     r.status_code == 423, str(r.status_code)))
+
+        revs = client.get(f"/sections/{verse}/revisions").json()
+        client.post(f"/sections/{verse}/roles", json={
+            "role_type": "double", "assignments": [{"singer_id": ids["Brad"]}]})
+        run(client.post(f"/sections/{verse}/regenerate", json={}).json())
+        restored = client.post(f"/sections/{verse}/rollback",
+                               json={"revision": revs[0]["revision"]}).json()
+        rows.append(("Rollback restores a prior revision",
+                     len(restored) == len(client.get(f"/sections/{verse}/roles").json())
+                     and len(restored) == 2, f"{len(restored)} roles"))
+    except Exception as exc:  # noqa: BLE001
+        rows.append(("Surgical regeneration", False, repr(exc)))
+
+    return rows
+
+
+def stage10(client) -> list[Row]:
+    rows: list[Row] = []
+    client.get("/bands").json()
+    brian = client.post("/singers", json={"name": "Brian"}).json()["id"]
+    pete = client.post("/singers", json={"name": "Pete"}).json()["id"]
+    client.patch(f"/singers/{brian}", json={
+        "consent_generation": True, "energy_fit": "high", "scream_enabled": True,
+        "preferred_roles": ["chorus_lead", "scream", "high_harmony", "gang"],
+        "range_low_midi": 48, "range_high_midi": 72})
+    client.patch(f"/singers/{pete}", json={
+        "consent_generation": True, "energy_fit": "mid",
+        "preferred_roles": ["verse_lead", "octave_double", "low_harmony"],
+        "range_low_midi": 45, "range_high_midi": 64})
+    song = client.post("/songs", json={"title": "Gate S10", "seed": 9, "bpm": 128}).json()["id"]
+    secs = {}
+    for stype, a, b in (("verse", 0, 8), ("chorus", 8, 16), ("breakdown", 16, 24)):
+        secs[stype] = client.post(
+            f"/songs/{song}/sections",
+            json={"section_type": stype, "start_time": a, "end_time": b},
+        ).json()["id"]
+
+    try:
+        rec = client.get(f"/songs/{song}/arrangement/recommend").json()
+        complete = all(
+            s["recommendations"]
+            and any(r["role_type"] == "lead" for r in s["recommendations"])
+            and all(0.0 <= r["confidence"] <= 1.0 and r["rationale"] for r in s["recommendations"])
+            for s in rec["sections"]
+        )
+        rows.append(("Recommends a complete, scored vocal map", complete,
+                     f"{len(rec['sections'])} sections"))
+
+        by_type = {s["section_type"]: s for s in rec["sections"]}
+        chorus_lead = next(r for r in by_type["chorus"]["recommendations"]
+                           if r["role_type"] == "lead")["assignments"][0]["singer_id"]
+        verse_lead = next(r for r in by_type["verse"]["recommendations"]
+                          if r["role_type"] == "lead")["assignments"][0]["singer_id"]
+        rows.append(("Recommendations honour singer metadata",
+                     chorus_lead == brian and verse_lead == pete, "chorus->Brian, verse->Pete"))
+
+        res = client.post(f"/songs/{song}/arrangement/apply", json={}).json()
+        applied = len(res["applied"]) == 3 and res["skipped"] == []
+        rows.append(("Apply creates roles on empty sections", applied,
+                     f"{len(res['applied'])} sections"))
+
+        res2 = client.post(f"/songs/{song}/arrangement/apply", json={}).json()
+        rows.append(("Re-apply never overwrites without an explicit flag",
+                     res2["applied"] == []
+                     and {s["reason"] for s in res2["skipped"]} == {"already has roles"},
+                     f"{len(res2['skipped'])} skipped"))
+
+        client.post(f"/sections/{secs['verse']}/lock", params={"locked": True})
+        res3 = client.post(
+            f"/songs/{song}/arrangement/apply", json={"overwrite": True}
+        ).json()
+        locked_skipped = any(
+            s["section_id"] == secs["verse"] and s["reason"] == "locked"
+            for s in res3["skipped"]
+        )
+        rows.append(("Locked sections are never touched", locked_skipped, "verse skipped"))
+    except Exception as exc:  # noqa: BLE001
+        rows.append(("Intelligent vocal arranger", False, repr(exc)))
+
+    return rows
+
+
+def stage11(client) -> list[Row]:
+    import hashlib
+
+    from sr.config import get_settings
+
+    rows: list[Row] = []
+    settings = get_settings()
+
+    # flag OFF
+    settings.experimental_morph = False
+    _, ids = _consenting_band(client)
+    song = client.post("/songs", json={"title": "Gate S11", "seed": 2}).json()["id"]
+    sec = client.post(
+        f"/songs/{song}/sections",
+        json={"section_type": "bridge", "start_time": 0, "end_time": 4},
+    ).json()["id"]
+    probe = client.get("/experimental").json()
+    blocked = client.post(f"/sections/{sec}/morphs", json={
+        "section_id": sec, "from_singer_id": ids["Brian"], "to_singer_id": ids["Pete"]})
+    rows.append(("Disabled by default (flag off -> 403)",
+                 probe == {"morph_enabled": False} and blocked.status_code == 403,
+                 str(blocked.status_code)))
+
+    # flag ON
+    settings.experimental_morph = True
+    try:
+        m = client.post(f"/sections/{sec}/morphs", json={
+            "section_id": sec, "from_singer_id": ids["Brian"], "to_singer_id": ids["Pete"],
+            "curve": "scurve", "start_frac": 0.3, "end_frac": 0.7}).json()
+
+        def preview():
+            j = client.post(f"/morphs/{m['id']}/preview", json={}).json()
+            j = client.post(f"/jobs/{j['id']}/wait", params={"timeout": 90}).json()
+            aid = j["result_json"]["preview_asset_id"]
+            blob = client.get(f"/songs/{song}/assets/{aid}/download").content
+            return j["result_json"]["quality"], hashlib.sha256(blob).hexdigest()
+
+        q1, s1 = preview()
+        q2, s2 = preview()
+        rows.append(("Preview is deterministic + carries quality flags",
+                     s1 == s2 and set(q1) >= {"score", "flags", "usable"},
+                     f"score {q1['score']}"))
+        rows.append(("A usable morph commits",
+                     (q1["usable"] and client.post(f"/morphs/{m['id']}/commit").status_code == 200)
+                     or not q1["usable"], f"usable={q1['usable']}"))
+
+        # a deliberately mismatched morph is flagged and blocked from commit
+        b2 = client.post("/singers", json={"name": "Mismatch"}).json()["id"]
+        client.patch(f"/singers/{b2}", json={"consent_generation": True})
+        client.patch(f"/singers/{b2}/voice-model", json={"median_f0": 300.0, "brightness": 0.9})
+        client.patch(f"/singers/{ids['Brian']}/voice-model",
+                     json={"median_f0": 90.0, "brightness": -0.9})
+        client.post(f"/songs/{song}/sections/{sec}/guide",
+                    files={"file": ("g.wav", _guide_bytes(4.0), "audio/wav")})
+        bad = client.post(f"/sections/{sec}/morphs", json={
+            "section_id": sec, "from_singer_id": ids["Brian"], "to_singer_id": b2}).json()
+        bj = client.post(f"/morphs/{bad['id']}/preview", json={}).json()
+        bj = client.post(f"/jobs/{bj['id']}/wait", params={"timeout": 90}).json()
+        bq = bj["result_json"]["quality"]
+        commit = client.post(f"/morphs/{bad['id']}/commit")
+        rows.append(("An unreliable morph is flagged + cannot commit",
+                     bq["usable"] is False and commit.status_code == 409,
+                     f"flags {bq['flags']}"))
+    except Exception as exc:  # noqa: BLE001
+        rows.append(("Experimental vocal morph", False, repr(exc)))
+    finally:
+        settings.experimental_morph = False
+
+    return rows
+
+
 STAGES = {
     "0": stage0, "1": stage1, "2": stage2, "3": stage3, "4": stage4,
-    "5": stage5, "6": stage6, "7": stage7,
+    "5": stage5, "6": stage6, "7": stage7, "8": stage8, "9": stage9,
+    "10": stage10, "11": stage11,
 }
 
 
 def main() -> int:
     _isolated_env()
-    stage = sys.argv[1] if len(sys.argv) > 1 else max(STAGES)
+    stage = sys.argv[1] if len(sys.argv) > 1 else max(STAGES, key=int)
     if stage not in STAGES:
         print(f"stage {stage} gate not implemented; available: {sorted(STAGES)}")
         return 2

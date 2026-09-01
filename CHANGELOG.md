@@ -1,5 +1,102 @@
 # Changelog
 
+## [Stage 11] — Experimental Vocal Morph — 2026-09-01
+
+Automated singer-to-singer transitions, behind an experimental flag, preview-only.
+
+### Added
+- **`SR_EXPERIMENTAL_MORPH`** (default `false`). Every `/morphs` route and
+  `/sections/{id}/morphs` returns **403** while it is off; `GET /experimental`
+  is an unauthenticated probe so the UI can hide the lane.
+- **`VocalMorph`** model + `POST /sections/{id}/morphs`, `GET`, `DELETE`.
+- **`POST /morphs/{id}/preview`** → `morph_preview` job (`sr/services/morph.py`):
+  resolves both singers' section vocals (reusing the render engine's
+  `_base_vocal`), crossfades them with a `linear` / `equal_power` / `scurve`
+  weight envelope over `[start_frac, end_frac]`, and writes a `morph_preview`
+  `AudioAsset`. Deterministic from the section seed.
+- **Quality flags**: envelope-correlation of the two performances
+  (`poor_alignment`), seam energy jump (`energy_jump`), gross pre-gain level
+  (`clipping`) → `score` + `usable`. `POST /morphs/{id}/commit` returns **409**
+  for an unusable morph. A morph never enters a section mix in this stage.
+- **Web**: "Vocal morph (experimental)" lane in the section panel, only rendered
+  when `/experimental` reports the flag on.
+- 4 new tests (137 total); `stage_gate.py 11`.
+
+---
+
+## [Stage 10] — Intelligent Vocal Arranger — 2026-09-01
+
+Recommends a full vocal map from singer metadata and section energy; never
+clobbers manual work.
+
+### Added
+- `Singer` gains `range_low_midi`, `range_high_midi`, `preferred_roles`,
+  `energy_fit`, `arranger_json` (user-entered, not measured).
+- **`sr/services/arranger.py`** — per section: energy from the instrumental bed's
+  loudness (section-type fallback), lyric density, then scored lead / double /
+  harmony / background / gang recommendations, each with a `confidence` and a
+  `rationale`.
+- **`GET /songs/{id}/arrangement/recommend`** (pure preview) and
+  **`POST /songs/{id}/arrangement/apply`** — a section that already has roles, or
+  is locked, is **skipped** and listed in `skipped` unless `overwrite: true`.
+- **Web**: "Auto arranger" panel — recommendation table + apply with an explicit
+  "replace existing roles" checkbox; singer arranger-metadata editor.
+- 3 new tests; `stage_gate.py 10`.
+
+---
+
+## [Stage 9] — Surgical Regeneration — 2026-09-01
+
+Change one section, one layer, or one singer without disturbing the rest.
+
+### Added
+- **`SongSection.locked`** + **`SectionRevision`** history (kind / roles snapshot
+  / render job id / `is_current`), written on every regeneration.
+- **`POST /sections/{id}/regenerate`** (`regenerate_section` job) — full section
+  re-render; other sections are untouched because section renders only ever write
+  their own section's assets.
+- **`POST /roles/{id}/regenerate`** (`regenerate_role` job) — re-renders the
+  section but perturbs only the target role's plan seed
+  (`render_section` gained `role_seed_salt`); every other role's stem is
+  byte-identical. Optional single-role **singer swap**
+  (`swap_from_singer_id` / `swap_to_singer_id`, consent-checked).
+- **`GET /sections/{id}/revisions`**, **`POST /sections/{id}/rollback`** (restores
+  a revision's role snapshot), **`POST /sections/{id}/lock`**. Locked sections
+  return **423** from every regen route and are skipped by the arranger.
+- **Web**: "Surgical regeneration" controls (lock, regenerate section, regenerate
+  one layer, rollback) in the section panel.
+- 5 new tests; `stage_gate.py 9`.
+
+---
+
+## [Stage 8] — Full Song Generator — 2026-09-01
+
+A prompt becomes a complete, editable project - never a single opaque file.
+
+### Added
+- **`sr/services/songplan.py`** — deterministic planner: prompt (+ optional
+  lyrics, Band DNA, seed) → a structure template, per-section bars / seconds /
+  energy / key, a lyric-line distribution (provided lyrics or a seeded scaffold),
+  and a default vocal arrangement. `GET /songs/{id}/plan` dry-runs it.
+- **`sr/common/guide.py`** — a deterministic monophonic guide melody per section
+  (outlines the key, contour follows section energy), fed to the Stage 3
+  voice-conversion path.
+- **`generate_full_song` job** (`sr/services/fullsong.py`, `POST /songs/{id}/generate`)
+  — builds the sections / roles / lyric lines, then for each section generates an
+  instrumental bed (Stage 7) + guide + a full layering render (Stages 2–4), and
+  concatenates the section renders into song-level `stem_instrumental` /
+  `vocal_bus` / `song_mix` / `song_master` (`AssetType.SONG_MASTER` added).
+  Reproducible from a seed.
+- **Web**: "Full song generator" panel on the song page.
+- 6 new tests (`test_songplan.py` + `test_stage8.py`); `stage_gate.py 8`.
+
+### Changed
+- `render_section` accepts `role_seed_salt` (used by Stage 9).
+- `JobType` gains `generate_song` / `regenerate_section` / `regenerate_role` /
+  `morph_preview`.
+
+---
+
 ## [Stage 7] — Band-Specific Music Generation — 2026-08-31
 
 The approved Band DNA now conditions a generated instrumental bed per section,

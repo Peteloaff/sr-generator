@@ -6,7 +6,7 @@ train or render without the required consent flags.
 
 from __future__ import annotations
 
-from sqlalchemy import JSON, Boolean, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Boolean, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from sr.models.base import Base, Timestamps, UUIDPrimaryKey
@@ -35,6 +35,15 @@ class Singer(UUIDPrimaryKey, Timestamps, Base):
 
     training_status: Mapped[str] = mapped_column(String(20), default="none")
     training_samples: Mapped[int] = mapped_column(Integer, default=0)
+
+    # Stage 10 arranger metadata - user-entered, not measured. Range as MIDI note
+    # numbers; preferred_roles a free list ("chorus_lead", "scream", "octave_double",
+    # "high_harmony", "low_harmony", "verse_lead", "gang"); energy_fit low|mid|high.
+    range_low_midi: Mapped[float | None] = mapped_column(Float, default=None)
+    range_high_midi: Mapped[float | None] = mapped_column(Float, default=None)
+    preferred_roles: Mapped[list | None] = mapped_column(JSON, default=None)
+    energy_fit: Mapped[str | None] = mapped_column(String(10), default=None)
+    arranger_json: Mapped[dict | None] = mapped_column(JSON, default=None)
 
     # Consent / governance - enforced before training or rendering.
     consent_training: Mapped[bool] = mapped_column(Boolean, default=False)

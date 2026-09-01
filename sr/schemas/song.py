@@ -72,6 +72,7 @@ class SectionUpdate(BaseModel):
     lyrics: str | None = None
     prompt_override: str | None = None
     generation_seed: int | None = None
+    locked: bool | None = None
 
 
 class SectionRead(BaseModel):
@@ -87,6 +88,7 @@ class SectionRead(BaseModel):
     lyrics: str | None
     prompt_override: str | None
     generation_seed: int | None
+    locked: bool = False
 
 
 class LyricLineCreate(BaseModel):

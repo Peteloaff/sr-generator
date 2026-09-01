@@ -112,6 +112,48 @@ def _generate_music(job: GenerationJob, db: Session) -> base.ProviderResult:
     )
 
 
+def _generate_song(job: GenerationJob, db: Session) -> base.ProviderResult:
+    from sr.services.fullsong import generate_full_song
+
+    if not job.song_id:
+        raise ValueError("generate_song job requires song_id")
+    return generate_full_song(
+        db, job, song_id=job.song_id, seed=_seed(job), params=job.parameters_json or {}
+    )
+
+
+def _regenerate_section(job: GenerationJob, db: Session) -> base.ProviderResult:
+    from sr.services.regen import regenerate_section
+
+    if not job.section_id:
+        raise ValueError("regenerate_section job requires section_id")
+    return regenerate_section(
+        db, job, section_id=job.section_id, seed=_seed(job), params=job.parameters_json or {}
+    )
+
+
+def _regenerate_role(job: GenerationJob, db: Session) -> base.ProviderResult:
+    from sr.services.regen import regenerate_role
+
+    params = job.parameters_json or {}
+    if not params.get("role_id"):
+        raise ValueError("regenerate_role job requires role_id")
+    return regenerate_role(
+        db, job, role_id=params["role_id"], seed=_seed(job), params=params
+    )
+
+
+def _morph_preview(job: GenerationJob, db: Session) -> base.ProviderResult:
+    from sr.services.morph import render_morph_preview
+
+    params = job.parameters_json or {}
+    if not params.get("morph_id"):
+        raise ValueError("morph_preview job requires morph_id")
+    return render_morph_preview(
+        db, job, morph_id=params["morph_id"], seed=_seed(job), params=params
+    )
+
+
 def _assemble_song(job: GenerationJob, db: Session) -> base.ProviderResult:
     if not job.song_id:
         raise ValueError("assemble_song job requires song_id")
@@ -183,6 +225,10 @@ _HANDLERS: dict[str, Handler] = {
     "import_folder": _import_folder,
     "train_band_adapter": _train_band_adapter,
     "generate_music": _generate_music,
+    "generate_song": _generate_song,
+    "regenerate_section": _regenerate_section,
+    "regenerate_role": _regenerate_role,
+    "morph_preview": _morph_preview,
     "separate_stems": _separate_stems,
     "assemble_song": _assemble_song,
     "train_singer": _train_singer,

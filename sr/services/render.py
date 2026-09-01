@@ -147,6 +147,11 @@ def render_section(
     base_key = f"renders/{song.id[:8]}/{job.id[:8]}"
     mode = str(params.get("mode", "ensemble"))
     is_flat = mode == "flat"
+    # Stage 9: reroll only the named roles (perturb their plan seed); every other
+    # role re-derives byte-identically because its inputs and seed are unchanged.
+    role_salts: dict[str, int] = {
+        str(k): int(v) for k, v in (params.get("role_seed_salt") or {}).items()
+    }
 
     assigned_ids = {a.singer_id for r in section.vocal_roles for a in r.assignments}
     singers = {
@@ -185,7 +190,12 @@ def render_section(
 
     roles = list(enumerate(section.vocal_roles))
     for ri, role in roles:
-        specs = plan_role_takes(role, seed, flat=is_flat)
+        role_seed = (
+            derive_seed(seed, "reroll", role_salts[role.id])
+            if role.id in role_salts
+            else seed
+        )
+        specs = plan_role_takes(role, role_seed, flat=is_flat)
         if not specs:
             continue
         take_arrays: list[np.ndarray] = []

@@ -1,10 +1,13 @@
 """SR Generator - private AI band music workstation.
 
-Stage 7: Band-specific music generation. A band adapter is distilled from the
-approved Band DNA (character / tempo / key priors); the music provider renders a
-deterministic instrumental bed for a section, tempo-locked to the song, that band
-vocals then render over. The synth engine is a stand-in for a real generative
-model - swap SR_MUSIC_PROVIDER=http to point at one. See ROADMAP.md.
+Stages 0-11 complete. A prompt becomes a full editable project - deterministic
+song plan, per-section instrumental + guide melody, layered band vocals, song
+stems + master (Stage 8). Any section, role, or singer regenerates in isolation
+with revision history and rollback (Stage 9). The arranger recommends a complete,
+editable vocal map from singer metadata and section energy without ever
+clobbering manual work (Stage 10). Experimental vocal morphing lives behind
+SR_EXPERIMENTAL_MORPH with quality gating (Stage 11). Every model is a swappable
+provider. See ROADMAP.md.
 """
 
-__version__ = "0.7.0"
+__version__ = "0.11.0"

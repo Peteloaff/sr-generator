@@ -7,6 +7,14 @@ from pydantic import BaseModel, ConfigDict, Field
 from sr.models.enums import TrainingStatus
 
 
+class ArrangerMeta(BaseModel):
+    range_low_midi: float | None = Field(default=None, ge=24, le=96)
+    range_high_midi: float | None = Field(default=None, ge=24, le=108)
+    preferred_roles: list[str] | None = None
+    energy_fit: str | None = Field(default=None, pattern="^(low|mid|high)$")
+    arranger_json: dict | None = None
+
+
 class SingerBase(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     display_name: str | None = None
@@ -26,7 +34,7 @@ class SingerCreate(SingerBase):
     band_id: str | None = None  # defaults to the active band
 
 
-class SingerUpdate(BaseModel):
+class SingerUpdate(ArrangerMeta):
     display_name: str | None = None
     notes: str | None = None
     voice_model_provider: str | None = None
@@ -41,7 +49,7 @@ class SingerUpdate(BaseModel):
     consent_source_ref: str | None = None
 
 
-class SingerRead(SingerBase):
+class SingerRead(SingerBase, ArrangerMeta):
     model_config = ConfigDict(from_attributes=True)
 
     id: str

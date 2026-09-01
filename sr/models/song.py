@@ -7,7 +7,7 @@ sr/common/resolver.py for the inheritance rule).
 
 from __future__ import annotations
 
-from sqlalchemy import Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from sr.models.base import Base, Timestamps, UUIDPrimaryKey
@@ -62,6 +62,8 @@ class SongSection(UUIDPrimaryKey, Timestamps, Base):
     lyrics: Mapped[str | None] = mapped_column(Text, default=None)
     prompt_override: Mapped[str | None] = mapped_column(Text, default=None)
     generation_seed: Mapped[int | None] = mapped_column(Integer, default=None)
+    # Stage 9: a locked section is protected from regeneration (surgical edits).
+    locked: Mapped[bool] = mapped_column(Boolean, default=False)
 
     song: Mapped[Song] = relationship(back_populates="sections")
     lines: Mapped[list[LyricLine]] = relationship(

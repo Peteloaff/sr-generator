@@ -3,7 +3,32 @@
 `scripts/test.ps1` runs ruff + pytest. `scripts/stage_gate.py <N>` checks a
 stage's exit criteria and prints PASS/FAIL.
 
-## Stage 7 — automated (118 tests total, all passing)
+## Stage 11 — automated (137 tests total, all passing)
+
+| Area | File | Covers |
+|---|---|---|
+| Vocal morph | `tests/test_stage11.py` | **flag off → `/experimental` reports it + `/morphs` is 403**; preview is **deterministic** (identical bytes) and returns `{score, flags, usable}`; a mismatched-profile morph flags `poor_alignment` and **`commit` → 409**; a smooth morph is `usable` and commits |
+
+## Stage 10 — automated (133 tests, all passing)
+
+| Area | File | Covers |
+|---|---|---|
+| Arranger | `tests/test_stage10.py` | recommendation is **complete** (a lead per section) and **scored** (confidence 0–1 + rationale); honours metadata (chorus-lead singer → chorus lead, verse-lead → verse); **apply on empty sections** creates editable roles; **re-apply skips every section** (`already has roles`) and changes nothing without `overwrite`; **locked sections are skipped** even with `overwrite` |
+
+## Stage 9 — automated (130 tests, all passing)
+
+| Area | File | Covers |
+|---|---|---|
+| Surgical regen | `tests/test_stage9.py` | **regenerate a section → other section's master byte-identical**; **regenerate one role → the other role's stem byte-identical, the target's differs**; **swap a singer only** (revision kind `swap`, assignment updated); **locked section → 423**; **rollback** restores an earlier revision's roles |
+
+## Stage 8 — automated (125 tests, all passing)
+
+| Area | File | Covers |
+|---|---|---|
+| Planner | `tests/test_songplan.py` | plan deterministic per seed + seed-sensitive; sections contiguous, energy in `[0,1]`; scaffold lyrics land only in lyric sections; provided lyrics are used |
+| Full song | `tests/test_stage8.py` | prompt → **≥5 sections, every verse/chorus has singer assignments**, ≥4 lyric lines; **not one opaque file** — `song_mix` + `song_master` + `stem_instrumental` + `vocal_bus` + per-section `mix`/`master`/`take_stem` all present (>15 assets); **re-render one section → other section byte-identical**; **same seed → identical `song_master` bytes** |
+
+## Stage 7 — automated (118 tests, all passing)
 
 | Area | File | Covers |
 |---|---|---|
@@ -76,7 +101,7 @@ stage's exit criteria and prints PASS/FAIL.
 | 1 | Percentage normalization totals 100 / predictable rounding | 0 | ✅ `normalize_weights` |
 | 2 | Ensemble allocator 70/20/10 @ 10 → 7/2/1; largest-remainder otherwise | 0 | ✅ `largest_remainder_allocation` |
 | 3 | Seed determinism → same orchestration + humanization | 0 (seeds) / 2 (full) | ✅ `test_render_is_repeatable_from_a_seed` (master byte-identical); Stage 7 `test_generated_instrumental_is_repeatable_and_tempo_locked` |
-| 4 | Section isolation — regen Chorus 1 leaves Verse 1 assets | 5 / 9 | ✅ assembly: untouched windows byte-identical (`test_import_separate_replace_assemble`); per-asset isolation at Stage 9 |
+| 4 | Section isolation — regen Chorus 1 leaves Verse 1 assets | 5 / 9 | ✅ Stage 9 `test_regenerate_section_isolated` + `test_regenerate_one_role_preserves_the_others` (byte-identical); assembly windows byte-identical (`test_import_separate_replace_assemble`) |
 | 5 | Stem preservation — every render outputs stems + master | 2 | ✅ `test_render_produces_isolated_and_combined_stems` |
 | 6 | Voice isolation — singers independently selectable; disabling one doesn't corrupt others | 3 | ✅ per-singer voice models; `test_guide_is_converted_per_singer` shows independent renders |
 | 7 | Consent enforcement — render fails safely when a flag is missing | 3 | ✅ `test_render_blocked_without_consent`, `test_train_without_consent_is_403` |
