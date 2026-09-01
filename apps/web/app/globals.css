@@ -319,3 +319,78 @@ pre {
   border: 1px dashed var(--line);
   border-radius: var(--r);
 }
+
+/* wide content (tables, code) scrolls inside its own box, never the page */
+.scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* ================================================================
+   Mobile / touch  (<= 640px)
+   ================================================================ */
+@media (max-width: 640px) {
+  html, body { overflow-x: hidden; }
+
+  header.appbar {
+    flex-wrap: wrap;
+    gap: 0.5rem 0.75rem;
+    padding: 0.55rem 0.9rem;
+  }
+  header.appbar .spacer { display: none; }
+  .band-switcher { margin-left: auto; }
+  header.appbar nav {
+    order: 3;
+    flex-basis: 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
+  }
+  header.appbar nav a { white-space: nowrap; padding: 0.35rem 0.6rem; }
+
+  main { padding: 1.1rem 0.9rem 4rem; }
+
+  h1 { font-size: 1.35rem; }
+  h2 { font-size: 1.05rem; margin-top: 1.5rem; }
+  .hero { padding: 1.5rem 0 1rem; }
+  .hero h1 { font-size: 1.9rem; }
+  .hero .lede { font-size: 1rem; }
+
+  .card { padding: 0.9rem; }
+  .card.pad-lg { padding: 1rem; }
+  /* let a wide table scroll within its card instead of blowing out the layout */
+  .card { overflow-x: auto; }
+
+  .stepnav {
+    position: static;
+    gap: 0.3rem;
+    margin: 0.4rem 0 1rem;
+  }
+  .stepnav button { padding: 0.45rem 0.4rem; font-size: 0.9rem; text-align: center; }
+  .stepnav button .n { margin-right: 0.35rem; width: 20px; height: 20px; }
+  .stepnav button span.faint { display: none !important; }
+
+  .grid { grid-template-columns: 1fr; }
+  .grid-2 { grid-template-columns: 1fr; }
+
+  button, .btn { min-height: 42px; }
+  button.sm, .btn.sm { min-height: 34px; }
+  button.big, .btn.big { width: 100%; }
+
+  input, select, textarea { font-size: 16px; }  /* stops iOS auto-zoom on focus */
+  .row > input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([style*="width"]),
+  .row > textarea,
+  .row > select { flex: 1 1 100%; }
+
+  audio { max-width: 100%; }
+  .recorder { flex-wrap: wrap; border-radius: var(--r); }
+  .row.space { flex-wrap: wrap; }
+
+  table { font-size: 0.86rem; }
+  th, td { padding: 0.4rem 0.5rem; }
+  pre { font-size: 0.78rem; }
+}
+
+/* tablet */
+@media (min-width: 641px) and (max-width: 900px) {
+  .hero h1 { font-size: 2rem; }
+  .stepnav button span.faint { font-size: 0.72rem; }
+}
