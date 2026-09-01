@@ -59,55 +59,65 @@ access key id / secret access key
 
 ## 2. API → Google Cloud Run
 
-**Artifact Registry repo** (once):
+Easiest with **Cloud Shell** (console.cloud.google.com → terminal icon, top
+right) — `gcloud` is installed and already logged in. Or install `gcloud`
+locally and `gcloud auth login`.
 
 ```bash
-gcloud artifacts repositories create sr-generator \
-  --repository-format=docker --location=us-central1
+# --- one-time setup --------------------------------------------------
+PROJECT_ID=your-gcp-project-id     # <- yours
+REGION=us-central1
+
+gcloud config set project "$PROJECT_ID"
+gcloud services enable run.googleapis.com cloudbuild.googleapis.com \
+  secretmanager.googleapis.com artifactregistry.googleapis.com
+
+# --- secrets (paste the real values from Supabase, step 1) ----------
+printf '%s' 'postgresql+psycopg://postgres.<ref>:<pw>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require' \
+  | gcloud secrets create SR_DATABASE_URL --data-file=-
+printf '%s' '<supabase s3 secret access key>' \
+  | gcloud secrets create SR_S3_SECRET_ACCESS_KEY --data-file=-
+
+# let Cloud Run read them
+PN=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
+for S in SR_DATABASE_URL SR_S3_SECRET_ACCESS_KEY; do
+  gcloud secrets add-iam-policy-binding "$S" \
+    --member="serviceAccount:${PN}-compute@developer.gserviceaccount.com" \
+    --role="roles/secretmanager.secretAccessor"
+done
+
+# --- get the code onto Cloud Shell, then deploy from source ---------
+git clone https://github.com/Peteloaff/sr-generator.git
+cd sr-generator
+
+gcloud run deploy sr-generator-api \
+  --source . --region "$REGION" --allow-unauthenticated \
+  --memory 2Gi --cpu 2 --timeout 900 --concurrency 4 --max-instances 3 \
+  --set-secrets SR_DATABASE_URL=SR_DATABASE_URL:latest,SR_S3_SECRET_ACCESS_KEY=SR_S3_SECRET_ACCESS_KEY:latest \
+  --set-env-vars '^@^SR_STORAGE_BACKEND=s3@SR_S3_ENDPOINT_URL=https://<ref>.supabase.co/storage/v1/s3@SR_S3_REGION=us-east-1@SR_S3_BUCKET=sr-audio@SR_S3_ACCESS_KEY_ID=<supabase s3 access key id>@SR_QUEUE_BACKEND=inline@SR_API_CORS_ORIGINS=*'
 ```
 
-**Store the DB URL + S3 secret in Secret Manager** (once):
+`--source .` uploads the repo, builds the `Dockerfile` on Cloud Build (creates an
+Artifact Registry repo automatically the first time — say yes), and deploys.
+`^@^` makes `@` the list separator so the URLs' `,` and `:` don't split it.
+Start with `SR_API_CORS_ORIGINS=*` and lock it to the Vercel URL after step 3.
+
+The container runs `alembic upgrade head` on start, so this first deploy creates
+the schema in Supabase. If the deploy shows the revision failing to start, check:
 
 ```bash
-printf '%s' 'postgresql+psycopg://...' | gcloud secrets create SR_DATABASE_URL --data-file=-
-printf '%s' '<supabase s3 secret>'     | gcloud secrets create SR_S3_SECRET_ACCESS_KEY --data-file=-
+gcloud run services logs read sr-generator-api --region "$REGION" --limit 50
 ```
 
-**Build + deploy** (from the repo root):
+Get the URL and smoke-test:
 
 ```bash
-gcloud builds submit --config cloudbuild.yaml \
-  --substitutions=_REGION=us-central1,_SERVICE=sr-generator-api
+URL=$(gcloud run services describe sr-generator-api --region "$REGION" --format='value(status.url)')
+curl "$URL/health"
 ```
 
-**Set the service config** (once — non-secret env + wire the secrets):
-
-```bash
-gcloud run services update sr-generator-api --region=us-central1 \
-  --set-secrets=SR_DATABASE_URL=SR_DATABASE_URL:latest,SR_S3_SECRET_ACCESS_KEY=SR_S3_SECRET_ACCESS_KEY:latest \
-  --set-env-vars=^@^\
-SR_STORAGE_BACKEND=s3@\
-SR_S3_ENDPOINT_URL=https://<ref>.supabase.co/storage/v1/s3@\
-SR_S3_REGION=us-east-1@\
-SR_S3_BUCKET=sr-audio@\
-SR_S3_ACCESS_KEY_ID=<supabase s3 access key id>@\
-SR_QUEUE_BACKEND=inline@\
-SR_API_CORS_ORIGINS=https://YOUR-APP.vercel.app
-```
-
-(The `^@^` sets `@` as the delimiter so the URLs' `,` don't split the list.)
-
-The container runs `alembic upgrade head` on start, so the first deploy creates
-the schema in Supabase. Watch it: `gcloud run services logs read sr-generator-api --region=us-central1`.
-
-Grab the service URL:
-
-```bash
-gcloud run services describe sr-generator-api --region=us-central1 --format='value(status.url)'
-# -> https://sr-generator-api-xxxx-uc.a.run.app
-```
-
-Smoke test: `curl https://sr-generator-api-xxxx-uc.a.run.app/health`
+Later redeploys: `git pull && gcloud run deploy sr-generator-api --source . --region "$REGION"`
+(env/secrets stick). `cloudbuild.yaml` is there if you want deploy-on-push CI.
 
 ---
 
