@@ -1,5 +1,52 @@
 # Changelog
 
+## [UX] Guided song workflow, redesign, and in-browser voice recording — 2026-09-01
+
+The web app was a working but utilitarian set of CRUD tables. This pass makes it
+a product: a guided path from "create a song" to a finished track, a modern
+visual design, and the ability to sing into the app and use your own voice.
+
+### Added
+- **New design system** (`apps/web/app/globals.css`): dark theme with a real
+  palette, type scale, `.card`/`.btn`/`.chip`/`.pill` components, a sticky
+  translucent app bar, and a `.stepnav` component. Every existing page inherits
+  it with no markup changes (tables, forms, `.row`, `.pill`, `.ab`, etc. all
+  restyled in place).
+- **Home page rewrite** — a hero, a "Create a song" card (title + style chips +
+  free-text prompt) that creates the song and drops straight into its workspace,
+  a card grid of existing songs, and a "Your band" strip.
+- **Song workspace reorganized into three guided steps** (`Story → Cast → Studio`,
+  `apps/web/app/songs/[id]/page.tsx`): Story (style prompt, lyrics, optional
+  cover-a-recording, manual sections behind an "advanced" toggle) → Cast (band
+  roster, auto-cast suggestions, per-section Vocal Director, per-line overrides)
+  → Studio (song master/mix/stems, per-section render + Stage 9 surgical
+  regeneration + Stage 11 morph). `GeneratePanel` and `ArrangerPanel` split out
+  of the old combined `ComposePanel`.
+- **`MicRecorder`** (`apps/web/components/MicRecorder.tsx`) — records from the
+  browser microphone (`MediaRecorder`, opus/webm), shows a live level meter and
+  timer, lets you preview and redo before committing a take. Self-contained;
+  degrades to a clear error if the mic is unavailable or permission is denied.
+- **`SingerCard`** — a singer as one card: voice status, consent toggles, the
+  recorder, a file-upload fallback, train/retrain, and a collapsible manual
+  tuning panel. Used on `/singers` and in the Cast step. Singers page gained a
+  one-click **"Add your voice"** action (creates a singer named "Me").
+- Recording feeds the existing Stage 3 singer voice-model pipeline directly
+  (`POST /singers/{id}/samples` → `train_singer`) — a recorded voice is a normal
+  reusable `Singer`, assignable to any role in any song, same as an uploaded one.
+- **Backend**: `.webm` / `.mp4` / `.mkv` added to `SUPPORTED_SUFFIXES` so
+  browser recordings (opus-in-webm) ingest through the existing ffmpeg pipeline
+  with no new code path. `test_browser_recording_webm_is_accepted`.
+- 1 new test (138 total); ruff clean; web build clean.
+
+### Changed
+- `Song` gains `prompt`/`lyrics` and `Job` gains `result_json` in the web API
+  client types (already present on the backend; the UI just hadn't typed them).
+  `api.createSong` accepts optional `prompt`/`lyrics`/`bpm`/`key`/`seed`.
+- Removed `ComposePanel.tsx` and `VoiceModel.tsx` (superseded by `GeneratePanel`
+  + `ArrangerPanel` and by `SingerCard`).
+
+---
+
 ## [Stage 11] — Experimental Vocal Morph — 2026-09-01
 
 Automated singer-to-singer transitions, behind an experimental flag, preview-only.

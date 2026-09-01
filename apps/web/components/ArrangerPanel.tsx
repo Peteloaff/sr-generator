@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { api, type SectionArrangement, type Singer } from "@/lib/api";
 
-export default function ComposePanel({
+export default function ArrangerPanel({
   songId,
   singers,
   onChange,
@@ -12,7 +12,6 @@ export default function ComposePanel({
   singers: Singer[];
   onChange: () => void;
 }) {
-  const [prompt, setPrompt] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [rec, setRec] = useState<SectionArrangement[] | null>(null);
@@ -32,13 +31,6 @@ export default function ComposePanel({
     }
   };
 
-  const generate = () =>
-    run("gen", async () => {
-      const job = await api.generateFullSong(songId, { prompt });
-      await api.waitJob(job.id);
-      onChange();
-    });
-
   const recommend = () =>
     run("rec", async () => {
       setRec((await api.recommendArrangement(songId)).sections);
@@ -48,46 +40,24 @@ export default function ComposePanel({
     run("apply", async () => {
       const r = await api.applyArrangement(songId, { overwrite });
       if (r.skipped.length) {
-        setErr(
-          "skipped: " +
-            r.skipped.map((s) => `${s.section_id.slice(0, 6)} (${s.reason})`).join(", "),
-        );
+        setErr(`skipped ${r.skipped.length} section(s) that already had roles — tick "replace" to overwrite`);
       }
       setRec(null);
       onChange();
     });
 
   return (
-    <div className="ab">
-      <h3>Full song generator</h3>
-      <p className="muted">
-        A prompt becomes a structured, editable project: sections, a default
-        arrangement, a per-section instrumental + guide melody, rendered band
-        vocals, and a song master. Regenerating one section later never touches
-        the rest.
-      </p>
-      {err && <p className="danger">{err}</p>}
-      <div className="row">
-        <input
-          placeholder="e.g. a driving night-time anthem"
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          style={{ minWidth: 320 }}
-        />
-        <button disabled={!!busy} onClick={generate}>
-          {busy === "gen" ? "generating…" : "Generate song"}
-        </button>
+    <div className="card">
+      <div className="row space tight">
+        <h3 style={{ margin: 0 }}>Auto-cast</h3>
+        <span className="muted" style={{ fontSize: "0.85rem" }}>
+          suggests who sings what, from each singer's preferences
+        </span>
       </div>
-
-      <h3 style={{ marginTop: 16 }}>Auto arranger</h3>
-      <p className="muted">
-        Recommends lead / double / harmony / gang roles from singer metadata and
-        section energy. Applying never overwrites existing roles unless you tick
-        the box.
-      </p>
-      <div className="row">
+      {err && <p className="danger">{err}</p>}
+      <div className="row tight">
         <button disabled={!!busy} onClick={recommend}>
-          {busy === "rec" ? "…" : "Recommend arrangement"}
+          {busy === "rec" ? "thinking…" : "Suggest casting"}
         </button>
         {rec && (
           <>
@@ -96,11 +66,11 @@ export default function ComposePanel({
                 type="checkbox"
                 checked={overwrite}
                 onChange={(e) => setOverwrite(e.target.checked)}
-              />{" "}
+              />
               replace existing roles
             </label>
-            <button disabled={!!busy} onClick={apply}>
-              {busy === "apply" ? "…" : "Apply"}
+            <button className="primary" disabled={!!busy} onClick={apply}>
+              {busy === "apply" ? "…" : "Apply casting"}
             </button>
           </>
         )}
@@ -111,7 +81,7 @@ export default function ComposePanel({
             <tr>
               <th>Section</th>
               <th>Energy</th>
-              <th>Recommended roles</th>
+              <th>Suggested</th>
             </tr>
           </thead>
           <tbody>
@@ -120,17 +90,15 @@ export default function ComposePanel({
                 <td>
                   {s.name || s.section_type}
                   {s.locked ? " 🔒" : ""}
-                  {s.has_roles ? " ·has roles" : ""}
+                  {s.has_roles ? " · cast" : ""}
                 </td>
-                <td className="muted">
-                  {s.energy_band} ({s.energy.toFixed(2)})
-                </td>
-                <td>
+                <td className="muted">{s.energy_band}</td>
+                <td style={{ fontSize: "0.85rem" }}>
                   {s.recommendations.map((r, i) => (
                     <div key={i} className="muted">
-                      <strong>{r.role_type}</strong>:{" "}
-                      {r.assignments.map((a) => nameOf(a.singer_id)).join(" / ")} · conf{" "}
-                      {r.confidence.toFixed(2)} · {r.rationale}
+                      <strong style={{ color: "var(--fg)" }}>{r.role_type}</strong>:{" "}
+                      {r.assignments.map((a) => nameOf(a.singer_id)).join(" / ")}{" "}
+                      <span className="faint">({Math.round(r.confidence * 100)}% — {r.rationale})</span>
                     </div>
                   ))}
                 </td>

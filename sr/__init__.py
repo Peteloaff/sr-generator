@@ -10,4 +10,4 @@ SR_EXPERIMENTAL_MORPH with quality gating (Stage 11). Every model is a swappable
 provider. See ROADMAP.md.
 """
 
-__version__ = "0.11.0"
+__version__ = "0.12.0"

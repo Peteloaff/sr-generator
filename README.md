@@ -14,10 +14,18 @@ vocals, and screams.
 > editable vocal map from singer metadata and section energy without ever
 > clobbering manual work (Stage 10). Experimental singer-to-singer morphing lives
 > behind `SR_EXPERIMENTAL_MORPH` with an honest quality gate (Stage 11). Every
-> model remains a swappable provider. See [ROADMAP.md](ROADMAP.md).
+> model remains a swappable provider. The web app is a guided
+> **Create → Story → Cast → Studio** flow, and you can record your own voice
+> from the browser microphone to sing on a song. See [ROADMAP.md](ROADMAP.md).
 
 ## What you can do today
 
+- **Create a song from the home page.** Title + style chips + a free-text prompt
+  drop you straight into a guided **Story → Cast → Studio** workspace: write the
+  lyrics and style, cast singers on every section, then generate and listen.
+- **Record your own voice from the browser.** "Add your voice" on the Singers
+  page (or from the Cast step) opens a mic recorder — record a few takes, train,
+  and your voice is a normal singer you can assign to any role in any song.
 - **Run more than one band.** Everything is scoped to a `Band`; a second band is
   one click, fully isolated. Default band auto-created.
 - **Upload an existing demo / instrumental** (wav/mp3/flac/m4a/ogg — ffmpeg is
@@ -44,9 +52,10 @@ vocals, and screams.
   from the approved catalogue; then on any section pick the adapter and
   **Generate instrumental** — a deterministic bed locked to the song's tempo and
   key, which the vocal render then mixes over. Same seed → identical bytes.
-- **Give each singer a voice**: upload training samples and run the analysis, or
-  set the profile by hand (pitch / formant / brightness / breathiness /
-  roughness). Training and generation are blocked until you grant consent.
+- **Give each singer a voice**: record or upload training samples and run the
+  analysis, or set the profile by hand (pitch / formant / brightness /
+  breathiness / roughness). Training and generation are blocked until you grant
+  consent.
 - **Render a section**: upload one guide vocal and each singer with a ready voice
   model has it converted into their voice; or upload a real take per singer; or
   fall back to a placeholder. Hit Render → humanized per-take stems, grouped

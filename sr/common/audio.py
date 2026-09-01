@@ -22,6 +22,7 @@ FFMPEG = imageio_ffmpeg.get_ffmpeg_exe()
 CANONICAL_RATE = 44100
 SUPPORTED_SUFFIXES = {
     ".wav", ".mp3", ".flac", ".m4a", ".aac", ".ogg", ".opus", ".aiff", ".aif", ".wma",
+    ".webm", ".mp4", ".mkv",  # in-browser MediaRecorder output (opus in webm/mp4)
 }
 
 _DUR_RE = re.compile(r"Duration:\s*(\d+):(\d+):(\d+\.\d+)")

@@ -71,6 +71,7 @@ export interface VoiceModel {
 export interface Song {
   id: string; band_id: string; project_id: string | null; title: string;
   status: string; bpm: number | null; key: string | null; duration: number | null; seed: number | null;
+  prompt: string | null; lyrics: string | null;
 }
 export interface Project { id: string; band_id: string; name: string; description: string | null }
 export interface Section {
@@ -150,6 +151,7 @@ export interface Job {
   id: string; job_type: string; status: string; provider: string;
   provider_version: string | null; progress: number; seed: number | null; error: string | null;
   logs: string | null;
+  result_json: Record<string, unknown> | null;
   outputs: AudioAsset[];
 }
 export interface RenderTake {
@@ -183,7 +185,10 @@ export const api = {
     req<Project>("/projects/import", { method: "POST", body: JSON.stringify(data) }),
 
   listSongs: () => req<Song[]>("/songs"),
-  createSong: (title: string) => req<Song>("/songs", { method: "POST", body: JSON.stringify({ title }) }),
+  createSong: (
+    title: string,
+    extra: { prompt?: string; lyrics?: string; bpm?: number; key?: string; seed?: number } = {},
+  ) => req<Song>("/songs", { method: "POST", body: JSON.stringify({ title, ...extra }) }),
   getSong: (id: string) => req<Song>(`/songs/${id}`),
   updateSong: (id: string, patch: Partial<Song>) =>
     req<Song>(`/songs/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),

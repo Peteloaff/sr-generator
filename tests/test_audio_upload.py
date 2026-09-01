@@ -32,3 +32,32 @@ def test_unsupported_type_rejected(client):
         f"/songs/{song_id}/audio", files={"file": ("notes.txt", b"hello", "text/plain")}
     )
     assert r.status_code == 415
+
+
+def test_browser_recording_webm_is_accepted(client, tmp_path):
+    """MediaRecorder in the browser produces webm/opus - the app must ingest it."""
+    import subprocess
+
+    import numpy as np
+    import soundfile as sf
+
+    from sr.common.audio import FFMPEG
+
+    wav = tmp_path / "tone.wav"
+    t = np.linspace(0, 1.0, 44100, endpoint=False)
+    sf.write(wav, (0.3 * np.sin(2 * np.pi * 200 * t)).astype("float32"), 44100)
+    webm = tmp_path / "recording.webm"
+    subprocess.run(
+        [FFMPEG, "-y", "-v", "quiet", "-i", str(wav), "-c:a", "libopus", str(webm)],
+        check=True,
+    )
+
+    singer = client.post("/singers", json={"name": "Recorder"}).json()["id"]
+    with webm.open("rb") as fh:
+        r = client.post(
+            f"/singers/{singer}/samples",
+            files={"file": ("recording.webm", fh, "audio/webm")},
+        )
+    assert r.status_code == 201, r.text
+    assert r.json()["asset_type"] == "singer_sample"
+    assert r.json()["duration"] > 0.5
