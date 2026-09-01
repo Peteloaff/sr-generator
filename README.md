@@ -145,3 +145,4 @@ storage/        local audio assets (references, training, generated, stems)
 | [TEST_PLAN.md](TEST_PLAN.md) | acceptance tests and audio evaluation protocol |
 | [DECISIONS.md](DECISIONS.md) | architecture decision records |
 | [CHANGELOG.md](CHANGELOG.md) | meaningful product changes |
+| [DEPLOY.md](DEPLOY.md) | hosting it (Vercel + Cloud Run + Supabase) |

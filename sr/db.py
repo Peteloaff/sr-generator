@@ -25,6 +25,9 @@ engine: Engine = create_engine(
     echo=False,
     future=True,
     connect_args={"check_same_thread": False} if _is_sqlite else {},
+    # Postgres over a connection pooler (Supabase) + a service that scales to zero:
+    # recycle idle connections and check them before use.
+    **({} if _is_sqlite else {"pool_pre_ping": True, "pool_recycle": 1800}),
 )
 
 

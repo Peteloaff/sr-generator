@@ -15,6 +15,9 @@ if config.config_file_name is not None:
 _URL = config.get_main_option("sqlalchemy.url") or get_settings().database_url
 config.set_main_option("sqlalchemy.url", _URL)
 target_metadata = Base.metadata
+# batch mode is only needed for SQLite's limited ALTER support; on Postgres it
+# would force table recreation, so keep it off there.
+_BATCH = _URL.startswith("sqlite")
 
 
 def run_migrations_offline() -> None:
@@ -22,7 +25,7 @@ def run_migrations_offline() -> None:
         url=_URL,
         target_metadata=target_metadata,
         literal_binds=True,
-        render_as_batch=True,
+        render_as_batch=_BATCH,
         compare_type=True,
     )
     with context.begin_transaction():
@@ -39,7 +42,7 @@ def run_migrations_online() -> None:
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
-            render_as_batch=True,  # required for SQLite ALTER support
+            render_as_batch=_BATCH,
             compare_type=True,
         )
         with context.begin_transaction():
