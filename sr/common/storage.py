@@ -170,7 +170,14 @@ class S3Storage(Storage):
             region_name=s.s3_region or "us-east-1",
             aws_access_key_id=s.s3_access_key_id,
             aws_secret_access_key=s.s3_secret_access_key,
-            config=Config(signature_version="s3v4", s3={"addressing_style": "path"}),
+            config=Config(
+                signature_version="s3v4",
+                s3={"addressing_style": "path"},
+                # boto3 >= 1.36 adds CRC32 checksums with streaming trailers by
+                # default; Supabase Storage (and most non-AWS S3) rejects those.
+                request_checksum_calculation="when_required",
+                response_checksum_validation="when_required",
+            ),
         )
 
     def ensure_local(self, key: str) -> Path:
@@ -182,11 +189,11 @@ class S3Storage(Storage):
         return p
 
     def persist(self, key: str) -> None:
-        p = self.path_for(key)
-        self._client.upload_file(
-            str(p), self.bucket, key.lstrip("/"),
-            ExtraArgs={"ContentType": _content_type(key)},
-        )
+        with self.path_for(key).open("rb") as fh:
+            self._client.put_object(
+                Bucket=self.bucket, Key=key.lstrip("/"), Body=fh,
+                ContentType=_content_type(key),
+            )
 
     def write_bytes(self, key: str, data: bytes) -> str:
         p = self.path_for(key)
