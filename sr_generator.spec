@@ -58,7 +58,7 @@ exe = EXE(
     name="SR Generator",
     console=True,
     disable_windowed_traceback=False,
-    icon=None,
+    icon="assets/icon.ico",
 )
 coll = COLLECT(
     exe,

@@ -7,6 +7,8 @@
 # Prereqs on the build machine: Python 3.12 with this repo installed
 # (pip install -e ".[cloud,desktop]"), and Node 18+ for the web build.
 
+param([switch]$NoShortcut)
+
 $ErrorActionPreference = "Stop"
 $repo = Split-Path -Parent $PSScriptRoot
 Set-Location $repo
@@ -32,6 +34,21 @@ python -m PyInstaller sr_generator.spec --noconfirm --clean
 
 $out = Join-Path $repo "dist/SR Generator/SR Generator.exe"
 if (-not (Test-Path $out)) { throw "PyInstaller did not produce $out" }
+
+# Drop a shortcut on the Desktop and in the Start Menu (skip with -NoShortcut).
+if (-not $NoShortcut) {
+    $ws = New-Object -ComObject WScript.Shell
+    foreach ($dir in @([Environment]::GetFolderPath('Desktop'),
+                       (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'))) {
+        $lnk = $ws.CreateShortcut((Join-Path $dir 'SR Generator.lnk'))
+        $lnk.TargetPath = $out
+        $lnk.WorkingDirectory = Split-Path $out
+        $lnk.IconLocation = "$out,0"
+        $lnk.Description = "SR Generator - local AI band music workstation"
+        $lnk.Save()
+        Write-Host "  shortcut -> $dir\SR Generator.lnk"
+    }
+}
 
 Write-Host ""
 Write-Host "Done. App folder: dist/SR Generator" -ForegroundColor Green
