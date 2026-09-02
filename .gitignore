@@ -19,6 +19,10 @@ apps/web/.next/
 apps/web/out/
 apps/web/next-env.d.ts
 
+# PyInstaller desktop build
+/build/
+/dist/
+
 # Local data (keep the folders, ignore contents)
 storage/references/*
 storage/training/*

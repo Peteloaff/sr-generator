@@ -36,7 +36,7 @@ export default function Home() {
     try {
       const promptText = [styles.join(", "), prompt.trim()].filter(Boolean).join(". ");
       const song = await api.createSong(title.trim(), promptText ? { prompt: promptText } : {});
-      router.push(`/songs/${song.id}`);
+      router.push(`/song?id=${song.id}`);
     } catch (e) {
       setErr(String(e));
       setCreating(false);
@@ -103,7 +103,7 @@ export default function Home() {
             .slice()
             .reverse()
             .map((s) => (
-              <Link key={s.id} href={`/songs/${s.id}`} className="card card-link">
+              <Link key={s.id} href={`/song?id=${s.id}`} className="card card-link">
                 <div className="row space tight">
                   <strong>{s.title}</strong>
                   <span className={`pill ${s.status === "ready" ? "ok" : ""}`}>{s.status}</span>

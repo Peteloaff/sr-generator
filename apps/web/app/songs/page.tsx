@@ -56,7 +56,7 @@ export default function SongsPage() {
           {songs.map((s) => (
             <tr key={s.id}>
               <td>
-                <Link href={`/songs/${s.id}`}>{s.title}</Link>
+                <Link href={`/song?id=${s.id}`}>{s.title}</Link>
               </td>
               <td>
                 <span className="pill">{s.status}</span>

@@ -1,7 +1,8 @@
 "use client";
 
-import { Fragment, use, useCallback, useEffect, useState } from "react";
+import { Fragment, Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   api,
   assetUrl,
@@ -29,8 +30,16 @@ const STEPS: { id: Step; label: string; hint: string }[] = [
   { id: "studio", label: "Studio", hint: "generate & listen" },
 ];
 
-export default function SongWorkspace({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function SongWorkspacePage() {
+  return (
+    <Suspense fallback={<p className="muted">loading…</p>}>
+      <SongWorkspace />
+    </Suspense>
+  );
+}
+
+function SongWorkspace() {
+  const id = useSearchParams().get("id") ?? "";
 
   const [song, setSong] = useState<Song | null>(null);
   const [singers, setSingers] = useState<Singer[]>([]);
@@ -46,6 +55,7 @@ export default function SongWorkspace({ params }: { params: Promise<{ id: string
   const [err, setErr] = useState<string | null>(null);
 
   const loadAll = useCallback(async () => {
+    if (!id) return;
     try {
       const [s, sg, sec, ln, assets] = await Promise.all([
         api.getSong(id),
@@ -92,6 +102,7 @@ export default function SongWorkspace({ params }: { params: Promise<{ id: string
     }
   };
 
+  if (!id) return <p className="danger">No song id in the URL.</p>;
   if (err) return <p className="danger">{err}</p>;
   if (!song) return <p className="muted">loading…</p>;
 

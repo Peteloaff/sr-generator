@@ -52,6 +52,15 @@ class Settings(BaseSettings):
     # Stage 11: vocal morph / timbre blend is experimental and off by default.
     experimental_morph: bool = False
 
+    # Desktop build: serve the exported Next.js frontend from this same process.
+    # When set, API routers move under "/api" and the static site is mounted at
+    # "/". Empty (the default) keeps the API-only layout used in the cloud.
+    frontend_dir: str = ""
+
+    @property
+    def serve_frontend(self) -> bool:
+        return bool(self.frontend_dir)
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.api_cors_origins.split(",") if o.strip()]

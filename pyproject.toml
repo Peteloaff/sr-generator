@@ -34,9 +34,14 @@ dev = [
     "ruff>=0.8",
     "moto[s3]>=5.0",
 ]
+# Desktop build: freeze the stack into a single .exe (scripts/build_desktop.ps1).
+desktop = [
+    "pyinstaller>=6.11",
+]
 
 [project.scripts]
 sr-worker = "sr.worker.worker:main"
+sr-desktop = "sr.desktop:main"
 
 [build-system]
 requires = ["setuptools>=68"]

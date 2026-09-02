@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from sr import __version__
 from sr.api.routers import (
@@ -60,18 +62,34 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    api_prefix = "/api" if settings.serve_frontend else ""
     for module in (
         health, bands, singers, voice_models, references, projects, songs,
         vocal, presets, render, song_edit, music, compose, regen, arranger,
         morph, jobs,
     ):
-        app.include_router(module.router)
+        app.include_router(module.router, prefix=api_prefix)
 
-    @app.get("/", tags=["meta"])
+    @app.get(f"{api_prefix}/", tags=["meta"])
     def root() -> dict:
         return {"name": "SR Generator", "version": __version__, "docs": "/docs"}
 
+    if settings.serve_frontend:
+        _mount_frontend(app, Path(settings.frontend_dir))
+
     return app
+
+
+def _mount_frontend(app: FastAPI, root: Path) -> None:
+    """Serve the exported Next.js site (desktop build) from this process.
+
+    Registered after the API routers so ``/api/**`` still wins. ``html=True``
+    resolves ``/song`` -> ``song/index.html`` for the client-routed pages.
+    """
+    root = root.resolve()
+    if not (root / "index.html").exists():
+        raise RuntimeError(f"SR_FRONTEND_DIR has no index.html: {root}")
+    app.mount("/", StaticFiles(directory=str(root), html=True), name="frontend")
 
 
 app = create_app()

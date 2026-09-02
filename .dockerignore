@@ -19,6 +19,9 @@ models/singers/**
 apps/web/node_modules
 apps/web/.next
 apps/web/out
+build
+dist
+*.spec
 tests
 docs
 *.md
