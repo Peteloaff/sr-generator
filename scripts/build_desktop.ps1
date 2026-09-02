@@ -21,6 +21,11 @@ Pop-Location
 if (-not (Test-Path apps/web/out/index.html)) {
     throw "web build did not produce apps/web/out/index.html"
 }
+# Guard against MSYS/Git-Bash mangling "/api" into "C:/Program Files/Git/api"
+# (happens if the web build is run from Git Bash instead of this script).
+$mangled = Select-String -Path apps/web/out/_next/static/chunks/*.js `
+    -Pattern "Program Files/Git/api", ":/Git/api" -List
+if ($mangled) { throw "web build baked a mangled API base ($($mangled[0].Line)). Re-run this script from PowerShell, not Git Bash." }
 
 Write-Host "==> Freezing the backend with PyInstaller..." -ForegroundColor Cyan
 python -m PyInstaller sr_generator.spec --noconfirm --clean

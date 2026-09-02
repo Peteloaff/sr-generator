@@ -78,13 +78,50 @@ def _migrate(res: Path) -> None:
     command.upgrade(cfg, "head")
 
 
+def _app_window_browser() -> str | None:
+    """Path to a Chromium browser that supports ``--app=`` (borderless window)."""
+    import shutil
+
+    pf = os.environ.get("ProgramFiles", r"C:\Program Files")
+    pf86 = os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")
+    local = os.environ.get("LOCALAPPDATA", "")
+    candidates = [
+        rf"{pf86}\Microsoft\Edge\Application\msedge.exe",
+        rf"{pf}\Microsoft\Edge\Application\msedge.exe",
+        rf"{pf}\Google\Chrome\Application\chrome.exe",
+        rf"{pf86}\Google\Chrome\Application\chrome.exe",
+        rf"{local}\Google\Chrome\Application\chrome.exe",
+    ]
+    for exe in candidates:
+        if exe and Path(exe).exists():
+            return exe
+    return shutil.which("chrome") or shutil.which("msedge")
+
+
 def _open_when_ready(url: str, port: int) -> None:
+    import subprocess
+
     for _ in range(200):
         try:
             with socket.create_connection(("127.0.0.1", port), timeout=0.25):
                 break
         except OSError:
             time.sleep(0.1)
+
+    if os.environ.get("SR_NO_APP_WINDOW") != "1":
+        exe = _app_window_browser()
+        if exe:
+            profile = _data_dir() / "app-window"
+            try:
+                subprocess.Popen(
+                    [exe, f"--app={url}", f"--user-data-dir={profile}",
+                     "--window-size=1440,900", "--no-first-run",
+                     "--no-default-browser-check"],
+                    close_fds=True,
+                )
+                return
+            except OSError:
+                pass
     webbrowser.open(url)
 
 
