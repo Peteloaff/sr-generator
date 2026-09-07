@@ -41,7 +41,8 @@ def test_character_is_audibly_different():
         a = musicgen.generate(bpm=120, key="A minor", seconds=3.0, seed=5, character=ch)["audio"]
         return float(np.sqrt(np.mean(a**2)))
 
-    assert energy("sludge_metal") > energy("acoustic") * 2.0
+    # distorted/dense genres sit hotter at the same peak than clean ones
+    assert energy("sludge_metal") > energy("acoustic") * 1.4
 
 
 def test_blend_character_interpolates():

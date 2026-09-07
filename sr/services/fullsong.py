@@ -227,11 +227,15 @@ def generate_full_song(
     storage = get_storage()
     base = f"songs/{song_id[:8]}/{job.id[:8]}"
     mix_pieces, vox_pieces, instr_pieces = [], [], []
+    _INSTR_STEMS = ("stem_drums", "stem_bass", "stem_rhythm", "stem_lead")
+    instr_stem_pieces: dict[str, list[np.ndarray]] = {s: [] for s in _INSTR_STEMS}
     for row, sec in zip(section_rows, plan["sections"], strict=True):
         n = max(1, int(sec["seconds"] * dsp.SR))
         instr = _section_piece(db, job.id, row.id, "instrumental_bed", n)
         # instrumental_bed asset stores its file under .../instrumental/canonical.wav
         instr_pieces.append(instr)
+        for stem in _INSTR_STEMS:
+            instr_stem_pieces[stem].append(_section_piece(db, job.id, row.id, stem, n))
         vox = _section_piece(db, job.id, row.id, "vocal_bus", n)
         vox_pieces.append(vox)
         mix = _section_piece(db, job.id, row.id, "mix", n)
@@ -260,6 +264,10 @@ def generate_full_song(
     song_vox = _concat(vox_pieces)
     song_mix = _concat(mix_pieces)
     _emit("stem_instrumental", song_instr, "full-song instrumental")
+    for stem, pieces in instr_stem_pieces.items():
+        joined = _concat(pieces)
+        if float(np.abs(joined).max()):
+            _emit(stem, joined, f"full-song {stem.replace('stem_', '')}")
     _emit("vocal_bus", song_vox, "full-song vocals")
     mix_asset = _emit("song_mix", song_mix, f"full-song mix ({len(plan['sections'])} sections)")
     master_asset = _emit("song_master", song_mix, "full-song master", master=True)

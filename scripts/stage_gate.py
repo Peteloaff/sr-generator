@@ -1152,10 +1152,84 @@ def stage14(client) -> list[Row]:
     return rows
 
 
+def stage15(client) -> list[Row]:
+    rows: list[Row] = []
+    try:
+        song = client.post("/songs", json={"title": "Cast Gate", "seed": 6}).json()
+        g = client.post(f"/songs/{song['id']}/generate", json={})
+        client.post(f"/jobs/{g.json()['id']}/wait", params={"timeout": 120})
+        secs = client.get(f"/songs/{song['id']}/sections").json()
+
+        d1 = client.post("/players", json={"name": "Bonzo", "role": "drums"}).json()["id"]
+        d2 = client.post("/players", json={"name": "Backup", "role": "drums"}).json()["id"]
+        for pid in (d1, d2):
+            client.patch(f"/players/{pid}", json={"consent_generation": True})
+        client.patch(f"/players/{d1}/style-model",
+                     json={"busyness": 0.9, "swing": 0.35, "dynamics": 0.8})
+
+        bad = client.put(f"/songs/{song['id']}/instruments",
+                         json={"role": "bass", "player_id": d1})
+        rows.append(("A player can only be cast on their own instrument",
+                     bad.status_code == 422, ""))
+
+        client.put(f"/songs/{song['id']}/instruments",
+                   json={"role": "drums", "player_id": d2})
+        client.put(f"/songs/{song['id']}/instruments",
+                   json={"role": "drums", "player_id": d1, "section_id": secs[1]["id"]})
+        client.put(f"/songs/{song['id']}/instruments",
+                   json={"role": "lead_guitar", "muted": True})
+        slots = client.get(f"/songs/{song['id']}/instruments").json()
+        rows.append(("Slots: whole-song default + per-section override + mute",
+                     len(slots) == 3, f"{len(slots)} slots"))
+
+        j0 = client.post(f"/songs/{song['id']}/sections/{secs[0]['id']}/generate-instrumental",
+                         json={}).json()
+        j1 = client.post(f"/songs/{song['id']}/sections/{secs[1]['id']}/generate-instrumental",
+                         json={}).json()
+        r0 = client.post(f"/jobs/{j0['id']}/wait", params={"timeout": 120}).json()
+        r1 = client.post(f"/jobs/{j1['id']}/wait", params={"timeout": 120}).json()
+        rows.append(("Section override wins over the song default",
+                     r0["result_json"]["cast"].get("drums") == "Backup"
+                     and r1["result_json"]["cast"].get("drums") == "Bonzo",
+                     f"{r0['result_json']['cast']} / {r1['result_json']['cast']}"))
+
+        assets = client.get(f"/songs/{song['id']}/assets").json()
+        s1_types = {a["asset_type"] for a in assets if a["section_id"] == secs[1]["id"]}
+        rows.append(("Per-instrument stems come out; muted parts do not",
+                     {"stem_drums", "stem_bass", "stem_rhythm"} <= s1_types
+                     and "stem_lead" not in s1_types,
+                     sorted(t for t in s1_types if t.startswith("stem_"))))
+
+        # explore + dials are accepted and change the render
+        import hashlib
+
+        def render_hash(explore, dials):
+            client.put(f"/songs/{song['id']}/instruments", json={
+                "role": "drums", "player_id": d1, "section_id": secs[0]["id"],
+                "explore": explore, "dials": dials})
+            jj = client.post(
+                f"/songs/{song['id']}/sections/{secs[0]['id']}/generate-instrumental",
+                json={"seed": 9}).json()
+            client.post(f"/jobs/{jj['id']}/wait", params={"timeout": 120})
+            a = next(x for x in client.get(f"/songs/{song['id']}/assets").json()
+                     if x["asset_type"] == "stem_drums" and x["section_id"] == secs[0]["id"])
+            return hashlib.sha256(
+                client.get(f"/songs/{song['id']}/assets/{a['id']}/download").content
+            ).hexdigest()
+
+        h1 = render_hash(0.0, None)
+        h2 = render_hash(0.9, {"busier": 1.0, "harder": 1.0})
+        rows.append(("The explore knob + dials change what's played", h1 != h2, ""))
+    except Exception as exc:  # noqa: BLE001
+        rows.append(("Instrument casting", False, repr(exc)))
+    return rows
+
+
 STAGES = {
     "0": stage0, "1": stage1, "2": stage2, "3": stage3, "4": stage4,
     "5": stage5, "6": stage6, "7": stage7, "8": stage8, "9": stage9,
     "10": stage10, "11": stage11, "12": stage12, "13": stage13, "14": stage14,
+    "15": stage15,
 }
 
 

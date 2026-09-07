@@ -72,10 +72,11 @@ class LocalSynthMusicProvider(MusicGenerationProvider):
         if params.get("progressions"):
             character["progressions"] = list(params["progressions"])
         energy = params.get("energy_curve") or adapter.get("energy_profile")
+        players = params.get("players") or None
 
         out = musicgen.generate(
             bpm=float(bpm), key=str(key), seconds=seconds, seed=seed,
-            character=character, energy_curve=energy, sr=SR,
+            character=character, energy_curve=energy, players=players, sr=SR,
         )
         meta = out["metadata"]
         meta["prompt"] = prompt
@@ -83,4 +84,5 @@ class LocalSynthMusicProvider(MusicGenerationProvider):
         return MusicGeneration(
             audio=out["audio"], sample_rate=out["sample_rate"],
             provider=self.name, provider_version=self.version, metadata=meta,
+            stems=out.get("stems"),
         )

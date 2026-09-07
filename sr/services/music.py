@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -21,6 +22,7 @@ from sr.models.generation_job import GenerationJob
 from sr.models.song import SongSection
 from sr.providers.base import ProviderResult
 from sr.providers.registry import get_provider
+from sr.services.casting import resolve_section_players
 from sr.services.dna import band_dna
 from sr.services.manifest import build_manifest
 from sr.worker.progress import report as report_progress
@@ -137,9 +139,13 @@ def generate_instrumental(
         genre_name, adapter_spec.get("character") or {},
         float(params.get("style_blend", 0.6)),
     )
+    section_players = params.get("players")
+    if section_players is None:
+        section_players = resolve_section_players(db, section, seed=seed)
     gen_params = {
         "duration": seconds,
         "character": character,
+        "players": section_players or None,
         **({"bpm": params["bpm"]} if params.get("bpm") else ({"bpm": bpm} if bpm else {})),
         **({"key": params["key"]} if params.get("key") else ({"key": key} if key else {})),
     }
@@ -156,9 +162,14 @@ def generate_instrumental(
     key_path = f"{base}/canonical.wav"
     storage.save_wav(key_path, result.audio, result.sample_rate)
 
+    _STEM_ASSET = {
+        "drums": "stem_drums", "bass": "stem_bass",
+        "rhythm": "stem_rhythm", "lead": "stem_lead",
+    }
     for old in db.scalars(
         select(AudioAsset).where(
-            AudioAsset.section_id == section_id, AudioAsset.asset_type == "instrumental_bed"
+            AudioAsset.section_id == section_id,
+            AudioAsset.asset_type.in_(["instrumental_bed", *_STEM_ASSET.values()]),
         )
     ):
         db.delete(old)
@@ -175,12 +186,43 @@ def generate_instrumental(
         duration=round(result.audio.shape[0] / result.sample_rate, 3),
     )
     db.add(asset)
+
+    stem_ids: dict[str, str] = {}
+    for part, arr in (result.stems or {}).items():
+        atype = _STEM_ASSET.get(part)
+        if atype is None or not float(np.abs(arr).max()):
+            continue
+        skey = f"{base}/{part}.wav"
+        storage.save_wav(skey, arr, result.sample_rate)
+        who = (section_players or {}).get(
+            {"rhythm": "rhythm_guitar", "lead": "lead_guitar"}.get(part, part), {}
+        ).get("player_name")
+        s_asset = AudioAsset(
+            song_id=song.id, section_id=section_id, generation_job_id=job.id,
+            parent_asset_id=asset.id, asset_type=atype, file_path=skey,
+            label=f"{part}" + (f" - {who}" if who else ""),
+            sample_rate=result.sample_rate, channels=2,
+            duration=round(arr.shape[0] / result.sample_rate, 3),
+        )
+        db.add(s_asset)
+        db.flush()
+        stem_ids[part] = s_asset.id
     db.flush()
+
+    cast = {
+        r: v.get("player_name")
+        for r, v in (section_players or {}).items()
+        if v.get("player_name")
+    }
     return ProviderResult(
         provider=result.provider, provider_version=result.provider_version, outputs=[],
         metadata={
             "section_id": section_id, "asset_id": asset.id, "seed": seed,
-            "adapter_id": adapter_id, **result.metadata,
+            "adapter_id": adapter_id, "cast": cast, "stem_ids": stem_ids,
+            **result.metadata,
         },
-        logs=[f"generated {seconds}s instrumental -> {Path(key_path).name}"],
+        logs=[
+            f"generated {seconds}s instrumental -> {Path(key_path).name}"
+            + (f"  cast: {cast}" if cast else ""),
+        ],
     )

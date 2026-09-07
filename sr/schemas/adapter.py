@@ -31,3 +31,5 @@ class GenerateInstrumentalRequest(BaseModel):
     bpm: float | None = Field(default=None, gt=40, le=220)
     key: str | None = None
     duration: float | None = Field(default=None, gt=0, le=300)
+    genre: str | None = Field(default=None, max_length=40)
+    style_blend: float | None = Field(default=None, ge=0.0, le=1.0)

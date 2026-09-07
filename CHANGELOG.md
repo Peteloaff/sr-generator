@@ -1,5 +1,32 @@
 # Changelog
 
+## [Stage 15] Instrument casting — 2026-09-07
+
+Cast a trained player on each instrument, per song or per section; generation is
+conditioned on their learned style; every instrument comes out as its own stem.
+
+### Added
+- **`InstrumentSlot`** (`sr/models/instrument_slot.py`, migration
+  `d4b8f1907e63`) — `(song_id, section_id?, role, player_id, muted, gain_db,
+  explore, dials_json)`. A `section_id` of NULL is the whole-song default; a
+  section-scoped slot overrides it.
+- **`sr/services/casting.py`** — resolves section -> role -> player -> *effective*
+  style profile: learned style, then the slot's **dials** (busier / brighter /
+  harder / push / swing, each -1..1), then the **explore** knob (0 = faithful,
+  1 = wander), then gain / mute. Consent-gated (`consent_generation`).
+- **`musicgen`** now takes `players={role: profile}` and returns per-part stems
+  (`drums` / `bass` / `rhythm` / `lead`) that sum exactly to the mix. Each part
+  is shaped by its player: drummer busyness/swing/dynamics, bassist
+  drive/register/sustain, guitarist drive/brightness, lead density/tone.
+- **`generate_instrumental`** writes `stem_drums` / `stem_bass` / `stem_rhythm` /
+  `stem_lead` section assets (labelled with the player's name) alongside the
+  summed `instrumental_bed`; `fullsong` concatenates them into song-level stems.
+- **`GET/PUT/DELETE /songs/{id}/instruments`**; `genre` / `style_blend` also on
+  the per-section generate-instrumental request.
+- Fixed an `_adsr` edge case where a release longer than the note zeroed the
+  envelope (surfaced by busier lead lines).
+- `scripts/stage_gate.py 15`; `tests/test_casting.py` (6 tests, 167 total).
+
 ## [Stage 14] Genre / song feel — 2026-09-07
 
 Play a song as metal, sludge metal, doom, punk, acoustic, folk, synthwave... —

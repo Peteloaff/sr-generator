@@ -13,6 +13,7 @@ from sr import __version__
 from sr.api.routers import (
     arranger,
     bands,
+    casting,
     compose,
     genres,
     health,
@@ -69,7 +70,7 @@ def create_app() -> FastAPI:
     for module in (
         health, bands, singers, players, voice_models, style_models, references,
         projects, songs, vocal, presets, render, song_edit, music, compose, regen,
-        arranger, morph, genres, jobs,
+        arranger, morph, genres, casting, jobs,
     ):
         app.include_router(module.router, prefix=api_prefix)
 

@@ -98,6 +98,8 @@ class AssetType(StrEnum):
     ROLE_STEM = "role_stem"  # all takes of one vocal role, summed
     STEM_DRUMS = "stem_drums"
     STEM_BASS = "stem_bass"
+    STEM_RHYTHM = "stem_rhythm"  # rhythm guitar / keys chord bed (Stage 15)
+    STEM_LEAD = "stem_lead"  # lead guitar / keys melodic line (Stage 15)
     STEM_GUITARS = "stem_guitars"
     STEM_SYNTHS = "stem_synths"
     STEM_LEAD_VOCAL = "stem_lead_vocal"

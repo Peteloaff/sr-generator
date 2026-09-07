@@ -60,13 +60,19 @@ class AudioAnalysis:
 
 @dataclass
 class MusicGeneration:
-    """A generated instrumental section as raw stereo audio + generation metadata."""
+    """A generated instrumental section as raw stereo audio + generation metadata.
+
+    ``stems`` optionally carries the per-instrument parts (``drums`` / ``bass`` /
+    ``rhythm`` / ``lead``) that sum to ``audio`` - written out as section stems so
+    the project stays fully editable.
+    """
 
     audio: np.ndarray
     sample_rate: int
     provider: str
     provider_version: str
     metadata: dict[str, Any] = field(default_factory=dict)
+    stems: dict[str, np.ndarray] | None = None
 
 
 @dataclass
