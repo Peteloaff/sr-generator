@@ -1,5 +1,31 @@
 # Changelog
 
+## [Stage 13] Player style learning — 2026-09-07
+
+Upload songs a player performed on; separate their instrument; learn the style.
+
+### Added
+- **`DemucsStemProvider`** (`sr/providers/multistem_demucs.py`) — 6-way
+  separation via `htdemucs_6s` (drums / bass / guitar / keys / other / vocal).
+  Lazy import; `shifts=0` so it is reproducible. New `[separation]` extra pulls
+  `demucs`; weights download once on first use. `SR_MULTISTEM_PROVIDER=demucs`
+  (default) or `bandsplit` (`BandSplitStemProvider`, rough, no deps — used by CI
+  and as a fallback).
+- **`sr/common/playerstyle.py`** — `StyleProfile` (drive, brightness, register,
+  attack, sustain, note density, busyness, dynamics, syncopation, swing, low-end,
+  stereo width) + a deterministic `analyze(stem, role, bpm)` and `blend()`. These
+  are *tendencies*, not a recording.
+- **`PlayerStyleProvider`** ABC + `LocalDspPlayerStyleProvider`; new provider
+  kinds `multistem` + `playerstyle` in the registry.
+- **`train_player`** job (`sr/services/player.py`) — separates each
+  `player_sample`, keeps the player's instrument stem (stored as a `player_stem`
+  asset with lineage), blends the per-song profiles, writes it to the Player.
+- **`/players/{id}/samples`** + **`/players/{id}/style-model`** (`get` /
+  `train` / manual `patch`) — mirrors the singer voice-model routes.
+- `audio_assets.player_id` (migration `b2f1a6d34c07`); consent gate
+  (`require_player_training` / `_generation`); `scripts/stage_gate.py 13`;
+  `tests/test_player_style.py` (7 tests, 155 total).
+
 ## [Stage 12] Instrumentalist players roster — 2026-09-07
 
 First slice of the "AI band members" epic: instrumentalists alongside singers.

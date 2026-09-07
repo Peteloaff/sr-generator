@@ -10,8 +10,11 @@ from sr.config import get_settings
 from sr.providers import base, mock
 from sr.providers.analysis_http import HttpAnalysisProvider
 from sr.providers.analysis_local import LocalMirAnalysisProvider
+from sr.providers.multistem_demucs import DemucsStemProvider
+from sr.providers.multistem_local import BandSplitStemProvider
 from sr.providers.music_http import HttpMusicProvider
 from sr.providers.music_local import LocalSynthMusicProvider
+from sr.providers.playerstyle_local import LocalDspPlayerStyleProvider
 from sr.providers.stem_http import HttpStemProvider
 from sr.providers.stem_local import CenterSplitStemProvider
 from sr.providers.voice_http import HttpVoiceProvider
@@ -27,6 +30,10 @@ _REGISTRY: dict[tuple[str, str], type[base.BaseProvider]] = {
     ("stem", "mock"): mock.MockStemProvider,
     ("stem", "center_split"): CenterSplitStemProvider,
     ("stem", "http"): HttpStemProvider,
+    ("multistem", "demucs"): DemucsStemProvider,
+    ("multistem", "bandsplit"): BandSplitStemProvider,
+    ("multistem", "http"): HttpStemProvider,
+    ("playerstyle", "local_dsp"): LocalDspPlayerStyleProvider,
     ("analysis", "mock"): mock.MockAnalysisProvider,
     ("analysis", "local_mir"): LocalMirAnalysisProvider,
     ("analysis", "http"): HttpAnalysisProvider,
@@ -38,6 +45,8 @@ _CONFIG_KEY = {
     "music": "music_provider",
     "voice": "voice_provider",
     "stem": "stem_provider",
+    "multistem": "multistem_provider",
+    "playerstyle": "playerstyle_provider",
     "analysis": "analysis_provider",
     "mastering": "mastering_provider",
     "transcription": "transcription_provider",

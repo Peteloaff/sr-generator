@@ -27,6 +27,12 @@ cloud = [
     "psycopg[binary]>=3.2",
     "boto3>=1.35",
 ]
+# Real per-instrument separation for player-style learning (Stage 13). Pulls
+# torch; model weights download once on first use. Without it, set
+# SR_MULTISTEM_PROVIDER=bandsplit for the rough dependency-free fallback.
+separation = [
+    "demucs>=4.0.1",
+]
 dev = [
     "pytest>=8.3",
     "httpx>=0.28",

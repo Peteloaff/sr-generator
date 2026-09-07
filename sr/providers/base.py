@@ -153,6 +153,21 @@ class AudioAnalysisProvider(BaseProvider):
         """Analyse the audio at ``source_path``."""
 
 
+class PlayerStyleProvider(BaseProvider):
+    """Learns how a player plays an instrument - drive/tone, attack, how legato,
+    how busy, how dynamic, swing/syncopation - from one or more separated
+    instrument stems. A neural provider implements this same interface."""
+
+    #: does this provider learn a model from samples, or only apply a profile?
+    trains: bool = False
+
+    @abc.abstractmethod
+    def analyze(
+        self, stem_paths: list[Path], *, role: str, bpm: float = 0.0
+    ) -> dict[str, Any]:
+        """Derive a style profile from separated instrument stems for ``role``."""
+
+
 class MasteringProvider(BaseProvider):
     @abc.abstractmethod
     def master(self, *, mix_asset: str, params: dict[str, Any]) -> ProviderResult: ...
@@ -167,6 +182,8 @@ PROVIDER_KINDS = {
     "music": MusicGenerationProvider,
     "voice": VoiceProvider,
     "stem": StemSeparationProvider,
+    "multistem": StemSeparationProvider,
+    "playerstyle": PlayerStyleProvider,
     "analysis": AudioAnalysisProvider,
     "mastering": MasteringProvider,
     "transcription": TranscriptionProvider,

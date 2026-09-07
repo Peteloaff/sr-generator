@@ -203,6 +203,15 @@ def _train_singer(job: GenerationJob, db: Session) -> base.ProviderResult:
     )
 
 
+def _train_player(job: GenerationJob, db: Session) -> base.ProviderResult:
+    from sr.services.player import train_player
+
+    params = job.parameters_json or {}
+    if not params.get("player_id"):
+        raise ValueError("train_player job requires a player_id")
+    return train_player(db, job, player_id=str(params["player_id"]), params=params)
+
+
 def _master(job: GenerationJob, db: Session) -> base.ProviderResult:
     params = job.parameters_json or {}
     return get_provider("mastering").master(
@@ -232,6 +241,7 @@ _HANDLERS: dict[str, Handler] = {
     "separate_stems": _separate_stems,
     "assemble_song": _assemble_song,
     "train_singer": _train_singer,
+    "train_player": _train_player,
     "render_section": _render_section,
     "master": _master,
 }

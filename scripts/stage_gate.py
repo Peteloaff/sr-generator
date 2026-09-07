@@ -1031,10 +1031,81 @@ def stage12(client) -> list[Row]:
     return rows
 
 
+def _band_mix_bytes(seconds: float = 4.0, rate: int = 44100) -> bytes:
+    import numpy as np
+    import soundfile as sf
+
+    t = np.linspace(0, seconds, int(rate * seconds), endpoint=False)
+    drums = np.zeros_like(t)
+    for i in range(int(seconds / 0.5)):
+        s = int(i * 0.5 * rate)
+        env = np.exp(-np.arange(rate // 8) / (rate * 0.02))
+        drums[s : s + len(env)] += (np.sin(2 * np.pi * 60 * np.arange(len(env)) / rate) * env)
+    bass = 0.4 * np.sign(np.sin(2 * np.pi * 82.4 * t))
+    gtr = 0.3 * np.sign(np.sin(2 * np.pi * 220 * t))
+    mix = np.clip(0.6 * (drums + bass + gtr), -1, 1).astype("float32")
+    buf = io.BytesIO()
+    sf.write(buf, np.stack([mix, mix], axis=1), rate, format="WAV")
+    return buf.getvalue()
+
+
+def stage13(client) -> list[Row]:
+    rows: list[Row] = []
+    from sr.config import get_settings
+
+    settings = get_settings()
+    prior = settings.multistem_provider
+    settings.multistem_provider = "bandsplit"  # fast + no model download for the gate
+    client.get("/bands").json()
+    try:
+        pid = client.post("/players", json={"name": "Eddie", "role": "lead_guitar"}).json()["id"]
+
+        no_consent = client.post(f"/players/{pid}/style-model/train")
+        rows.append(("Style training is consent-gated",
+                     no_consent.status_code in (403, 422), f"HTTP {no_consent.status_code}"))
+
+        client.patch(f"/players/{pid}", json={"consent_training": True})
+        for i in range(2):
+            client.post(f"/players/{pid}/samples",
+                        files={"file": (f"s{i}.wav", _band_mix_bytes(), "audio/wav")})
+        job = client.post(f"/players/{pid}/style-model/train").json()
+        done = client.post(f"/jobs/{job['id']}/wait", params={"timeout": 120}).json()
+        prof = (done.get("result_json") or {}).get("profile") or {}
+        rows.append(("Separates each song + learns a style profile",
+                     done["status"] == "succeeded"
+                     and prof.get("role") == "lead_guitar"
+                     and all(0.0 <= prof.get(k, -1) <= 1.0
+                             for k in ("drive", "attack", "busyness", "dynamics")),
+                     f"drive={prof.get('drive')}, attack={prof.get('attack')}"))
+
+        sm = client.get(f"/players/{pid}/style-model").json()
+        rows.append(("Profile is stored on the player as a reusable named style",
+                     sm["training_status"] == "ready" and sm["training_samples"] == 2
+                     and sm["style_profile"]["role"] == "lead_guitar",
+                     sm["style_model_provider"]))
+
+        # retrain -> identical profile (deterministic)
+        job2 = client.post(f"/players/{pid}/style-model/train").json()
+        done2 = client.post(f"/jobs/{job2['id']}/wait", params={"timeout": 120}).json()
+        rows.append(("Style learning is deterministic",
+                     (done2.get("result_json") or {}).get("profile") == prof, ""))
+
+        p2 = client.post("/players", json={"name": "Manual", "role": "bass"}).json()["id"]
+        mp = client.patch(f"/players/{p2}/style-model", json={"drive": 0.15, "swing": 0.4})
+        rows.append(("A style can also be dialled in by hand",
+                     mp.status_code == 200 and mp.json()["style_profile"]["drive"] == 0.15
+                     and mp.json()["training_status"] == "ready", ""))
+    except Exception as exc:  # noqa: BLE001
+        rows.append(("Player style learning", False, repr(exc)))
+    finally:
+        settings.multistem_provider = prior
+    return rows
+
+
 STAGES = {
     "0": stage0, "1": stage1, "2": stage2, "3": stage3, "4": stage4,
     "5": stage5, "6": stage6, "7": stage7, "8": stage8, "9": stage9,
-    "10": stage10, "11": stage11, "12": stage12,
+    "10": stage10, "11": stage11, "12": stage12, "13": stage13,
 }
 
 

@@ -14,6 +14,8 @@ os.environ["SR_DATABASE_URL"] = f"sqlite:///{(_TMP / 'test.db').as_posix()}"
 os.environ["SR_STORAGE_ROOT"] = _TMP.as_posix()
 os.environ["SR_QUEUE_BACKEND"] = "eager"
 os.environ["SR_LOG_LEVEL"] = "WARNING"
+# Player-style tests use the dependency-free split; Demucs is exercised separately.
+os.environ.setdefault("SR_MULTISTEM_PROVIDER", "bandsplit")
 
 from fastapi.testclient import TestClient  # noqa: E402
 

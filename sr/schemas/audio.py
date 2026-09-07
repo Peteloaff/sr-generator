@@ -12,6 +12,7 @@ class AudioAssetRead(BaseModel):
     song_id: str | None
     section_id: str | None
     singer_id: str | None
+    player_id: str | None = None
     asset_type: str
     label: str | None
     file_path: str

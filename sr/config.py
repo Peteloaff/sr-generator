@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     voice_http_url: str = ""
     stem_provider: str = "center_split"
     stem_http_url: str = ""
+    # 6-way per-instrument separation for player-style learning (Stage 13).
+    # "demucs" (real, needs the [separation] extra) or "bandsplit" (rough, no deps).
+    multistem_provider: str = "demucs"
+    playerstyle_provider: str = "local_dsp"
     analysis_provider: str = "local_mir"
     analysis_http_url: str = ""
     mastering_provider: str = "mock"

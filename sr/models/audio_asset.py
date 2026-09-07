@@ -25,6 +25,9 @@ class AudioAsset(UUIDPrimaryKey, Timestamps, Base):
     singer_id: Mapped[str | None] = mapped_column(
         ForeignKey("singers.id", ondelete="SET NULL"), default=None, index=True
     )
+    player_id: Mapped[str | None] = mapped_column(
+        ForeignKey("players.id", ondelete="SET NULL"), default=None, index=True
+    )
     generation_job_id: Mapped[str | None] = mapped_column(
         ForeignKey("generation_jobs.id", ondelete="SET NULL"), default=None, index=True
     )

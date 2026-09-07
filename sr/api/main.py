@@ -27,6 +27,7 @@ from sr.api.routers import (
     singers,
     song_edit,
     songs,
+    style_models,
     vocal,
     voice_models,
 )
@@ -65,9 +66,9 @@ def create_app() -> FastAPI:
 
     api_prefix = "/api" if settings.serve_frontend else ""
     for module in (
-        health, bands, singers, players, voice_models, references, projects, songs,
-        vocal, presets, render, song_edit, music, compose, regen, arranger,
-        morph, jobs,
+        health, bands, singers, players, voice_models, style_models, references,
+        projects, songs, vocal, presets, render, song_edit, music, compose, regen,
+        arranger, morph, jobs,
     ):
         app.include_router(module.router, prefix=api_prefix)
 
