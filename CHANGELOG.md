@@ -1,5 +1,29 @@
 # Changelog
 
+## [Stage 14] Genre / song feel — 2026-09-07
+
+Play a song as metal, sludge metal, doom, punk, acoustic, folk, synthwave... —
+a band-level style, blended with the band's own DNA (not a replacement for it).
+
+### Added
+- **`sr/common/genre.py`** — 22 genre presets, each a bundle of tempo range,
+  mode, string tuning, section-length scale, structure bias, energy range,
+  swing, chord-progression bias, and an instrumental character (drive /
+  distortion, brightness, drum busyness, note sustain, sub weight).
+- **`Song.genre` + `Song.style_blend`** (0 = play like the band's DNA, 1 = fully
+  adopt the genre; default 0.6). Migration `c3a9e5b71d42`.
+- **`musicgen`** now responds to `distortion` (harder waveshaping), `sustain`
+  (longer notes/pads), `sub_weight` (heavier low end + octave-down bass),
+  `swing` (late off-beats), `tuning_semitones` (detune everything), and a
+  `progressions` allow-list.
+- **`songplan.plan_song(genre=...)`** applies the tempo range, minor/major key
+  bias, section-length scale, structure and energy clamps.
+- **`blend_character()`** (`sr/services/music.py`) interpolates the genre feel
+  with the band adapter's character by `style_blend`.
+- **`GET /genres`** + `/genres/{id}`; `genre` / `style_blend` on song
+  create/update and the full-song generate request.
+- `scripts/stage_gate.py 14`; `tests/test_genre.py` (6 tests, 161 total).
+
 ## [Stage 13] Player style learning — 2026-09-07
 
 Upload songs a player performed on; separate their instrument; learn the style.

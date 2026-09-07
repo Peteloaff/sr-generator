@@ -29,6 +29,10 @@ class Song(UUIDPrimaryKey, Timestamps, Base):
     duration: Mapped[float | None] = mapped_column(Float, default=None)
     prompt: Mapped[str | None] = mapped_column(Text, default=None)
     lyrics: Mapped[str | None] = mapped_column(Text, default=None)
+    # Genre / song feel (Stage 14). ``genre`` is a preset id (sr/common/genre.py);
+    # ``style_blend`` 0 = play like the band's own DNA, 1 = fully adopt the genre.
+    genre: Mapped[str | None] = mapped_column(String(40), default=None)
+    style_blend: Mapped[float] = mapped_column(Float, default=0.6)
     status: Mapped[str] = mapped_column(String(20), default="draft")
     seed: Mapped[int | None] = mapped_column(BigInteger, default=None)
     reference_profile_id: Mapped[str | None] = mapped_column(

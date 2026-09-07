@@ -41,6 +41,7 @@ def preview_plan(
         bpm=song.bpm,
         seed=seed or song.seed or 0,
         dna=band_dna(db, db.get(Band, song.band_id)),
+        genre=song.genre,
     )
 
 

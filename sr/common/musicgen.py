@@ -96,11 +96,24 @@ def generate(
     brightness = float(ch.get("brightness", 0.0))
     drive = float(ch.get("drive", 0.2))
     drum_busy = float(np.clip(ch.get("drum_busy", 0.5), 0.0, 1.0))
-    bpm = float(np.clip(bpm or 120.0, 60.0, 200.0))
+    # Genre-feel knobs (Stage 14). All optional; 0 => previous behaviour.
+    distortion = float(np.clip(ch.get("distortion", 0.0), 0.0, 1.0))
+    sustain = float(np.clip(ch.get("sustain", 0.5), 0.0, 1.0))
+    sub_weight = float(np.clip(ch.get("sub_weight", 0.35), 0.0, 1.0))
+    swing = float(np.clip(ch.get("swing", 0.0), 0.0, 0.6))
+    detune = float(ch.get("tuning_semitones", 0.0))
+    drive = float(np.clip(drive + 0.5 * distortion, 0.0, 1.0))
+    bpm = float(np.clip(bpm or 120.0, 40.0, 240.0))
     n = max(1, int(seconds * sr))
     tonic, mode = _tonic_semitone(key)
 
+    def note_hz(semitone_from_c: int, octave: int = 4) -> float:
+        return _note_hz(semitone_from_c, octave) * 2.0 ** (detune / 12.0)
+
     progs = _MINOR_PROG if mode == "minor" else _MAJOR_PROG
+    allowed = [p for p in (ch.get("progressions") or []) if p in progs]
+    if allowed:
+        progs = {p: progs[p] for p in allowed}
     prog_name = sorted(progs)[derive_seed(seed, "prog") % len(progs)]
     # start and end on the tonic so the key reads clearly
     degrees = [0, *progs[prog_name], 0]
@@ -109,9 +122,12 @@ def generate(
     spb = int(beat * sr)
     bars = max(1, int(np.ceil(seconds / (beat * 4))))
 
-    # tonic pedal - a quiet low drone the whole way through anchors the key
-    tonic_hz = _note_hz(tonic % 12, 2)
-    pedal = (_osc(tonic_hz, n, "sine") * 0.12).astype(np.float32)
+    # tonic pedal - a low drone the whole way through anchors the key; sub_weight
+    # and low tunings make it heavier (doom / sludge).
+    tonic_hz = note_hz(tonic % 12, 2)
+    pedal_gain = 0.08 + 0.16 * sub_weight
+    pedal = (_osc(tonic_hz, n, "sine") * pedal_gain).astype(np.float32)
+    swing_shift = int(swing * (spb // 2) * 0.5)
 
     drums = np.zeros(n, dtype=np.float32)
     bass = np.zeros(n, dtype=np.float32)
@@ -138,30 +154,33 @@ def generate(
             if b in (1, 3):
                 sn = _snare(min(seg, int(0.25 * sr)), derive_seed(seed, "sn", bar, b))
                 drums[s : s + len(sn)] += sn * 0.55
-            # hats: 8ths, more with busyness
+            # hats: 8ths, more with busyness; the off-beat is nudged late by swing
             steps = 2 if drum_busy > 0.35 else 1
             for h in range(steps):
-                hs = s + h * (spb // 2)
+                hs = s + h * (spb // 2) + (swing_shift if h == 1 else 0)
                 if hs >= n:
                     break
                 ht = _hat(min(n - hs, int(0.08 * sr)), derive_seed(seed, "hh", bar, b, h))
                 drums[hs : hs + len(ht)] += ht * (0.18 + 0.12 * drum_busy)
 
-            # bass: root, walk to fifth on beat 4
+            # bass: root, walk to fifth on beat 4. sustain lengthens the note;
+            # sub_weight adds an octave-down layer.
             bnote = fifth if b == 3 else root
-            bf = _note_hz(bnote % 12, 2)
-            benv = _adsr(seg, 0.005, 0.05, 0.7, 0.06)
+            bf = note_hz(bnote % 12, 2)
+            benv = _adsr(seg, 0.005, 0.05, 0.7, 0.05 + 0.5 * sustain)
             bwave = 0.7 * _osc(bf, seg, "sine") + 0.3 * _osc(bf, seg, "saw")
+            if sub_weight > 0.5:
+                bwave = bwave + (sub_weight - 0.5) * _osc(bf * 0.5, seg, "sine")
             bass[s:e] += (bwave * benv * 0.5).astype(np.float32)
 
         # chord pad for the whole bar
         ce = min(n, bar_start + spb * 4)
         cseg = ce - bar_start
         if cseg > 0:
-            penv = _adsr(cseg, 0.06, 0.2, 0.55, 0.25)
+            penv = _adsr(cseg, 0.06, 0.2, 0.4 + 0.4 * sustain, 0.2 + 0.7 * sustain)
             stack = np.zeros(cseg, dtype=np.float32)
             for note in (root, third, fifth, root + 12):
-                f = _note_hz(note % 12, 4 if note < 12 else 5)
+                f = note_hz(note % 12, 4 if note < 12 else 5)
                 stack += _osc(f, cseg, "saw") * 0.25
             # brightness -> simple high-frequency emphasis
             if abs(brightness) > 1e-3:
@@ -174,12 +193,12 @@ def generate(
             arp_notes = [root, third, fifth, root + 12]
             step = spb // 2
             for i in range(cseg // step):
-                a0 = bar_start + i * step
+                a0 = bar_start + i * step + (swing_shift if i % 2 else 0)
                 aseg = min(step, n - a0)
                 if aseg <= 0:
                     break
-                f = _note_hz(arp_notes[i % 4] % 12, 5)
-                aenv = _adsr(aseg, 0.003, 0.04, 0.3, 0.05)
+                f = note_hz(arp_notes[i % 4] % 12, 5)
+                aenv = _adsr(aseg, 0.003, 0.04, 0.25 + 0.4 * sustain, 0.04 + 0.2 * sustain)
                 arp[a0 : a0 + aseg] += (_osc(f, aseg, "square") * aenv * 0.09).astype(np.float32)
 
     # section energy envelope (from the band's mean energy profile)
@@ -194,9 +213,15 @@ def generate(
 
     drums, bass, chords, arp = map(_fit, (drums, bass, chords, arp))
     bass = bass + _fit(pedal)
-    mono = (drums + bass * ec + chords * ec + arp * ec).astype(np.float32)
-    if drive > 1e-3:
-        mono = ((1 - drive) * mono + drive * np.tanh(3 * mono) / np.tanh(3)).astype(np.float32)
+    # harder clip as distortion rises
+    shape = 3.0 + 7.0 * distortion
+
+    def _drive(x: np.ndarray) -> np.ndarray:
+        if drive <= 1e-3:
+            return x.astype(np.float32)
+        return ((1 - drive) * x + drive * np.tanh(shape * x) / np.tanh(shape)).astype(np.float32)
+
+    mono = _drive((drums + bass * ec + chords * ec + arp * ec).astype(np.float32))
     peak = float(np.max(np.abs(mono))) or 1.0
     mono = mono * (0.9 / peak)
 
@@ -204,9 +229,7 @@ def generate(
     spread = 0.15
     left = drums + bass + (chords + arp) * (1 - spread)
     right = drums + bass + (chords + arp) * (1 + spread)
-    st = np.stack([_fit(left), _fit(right)], axis=1) * ec[:, None]
-    if drive > 1e-3:
-        st = ((1 - drive) * st + drive * np.tanh(3 * st) / np.tanh(3)).astype(np.float32)
+    st = _drive(np.stack([_fit(left), _fit(right)], axis=1) * ec[:, None])
     stp = float(np.max(np.abs(st))) or 1.0
     stereo = (st * (0.9 / stp)).astype(np.float32)
 
@@ -218,7 +241,12 @@ def generate(
             "key": f"{_NOTES[tonic]} {mode}",
             "progression": prog_name,
             "bars": bars,
-            "character": {"brightness": brightness, "drive": drive, "drum_busy": drum_busy},
+            "character": {
+                "brightness": brightness, "drive": round(drive, 3),
+                "drum_busy": drum_busy, "distortion": distortion,
+                "sustain": sustain, "sub_weight": sub_weight,
+                "swing": swing, "tuning_semitones": detune,
+            },
             "seed": seed,
             "swing_hint_ms": round(bounded_jitter(derive_seed(seed, "swing"), 0, 12), 2),
         },

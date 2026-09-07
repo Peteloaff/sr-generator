@@ -11,6 +11,9 @@ class FullSongRequest(BaseModel):
     section_seconds: float | None = Field(default=None, gt=1, le=60)
     structure: list[str] | None = None
     replace: bool = True
+    # Genre / feel for this run; falls back to the song's saved genre.
+    genre: str | None = Field(default=None, max_length=40)
+    style_blend: float | None = Field(default=None, ge=0.0, le=1.0)
 
 
 class RegenerateSectionRequest(BaseModel):

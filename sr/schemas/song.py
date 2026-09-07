@@ -15,6 +15,8 @@ class SongCreate(BaseModel):
     time_signature: str | None = "4/4"
     prompt: str | None = None
     lyrics: str | None = None
+    genre: str | None = Field(default=None, max_length=40)
+    style_blend: float | None = Field(default=None, ge=0.0, le=1.0)
     seed: int | None = None
 
 
@@ -27,6 +29,8 @@ class SongUpdate(BaseModel):
     duration: float | None = None
     prompt: str | None = None
     lyrics: str | None = None
+    genre: str | None = Field(default=None, max_length=40)
+    style_blend: float | None = Field(default=None, ge=0.0, le=1.0)
     status: SongStatus | None = None
     seed: int | None = None
     reference_profile_id: str | None = None
@@ -45,6 +49,8 @@ class SongRead(BaseModel):
     duration: float | None
     prompt: str | None
     lyrics: str | None
+    genre: str | None
+    style_blend: float
     status: str
     seed: int | None
     reference_profile_id: str | None

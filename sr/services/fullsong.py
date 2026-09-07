@@ -129,11 +129,16 @@ def generate_full_song(
         if adapter is None or adapter.band_id != song.band_id:
             raise ValueError("adapter not found for this band")
 
+    genre = params.get("genre") or song.genre
+    style_blend = params.get("style_blend")
+    if style_blend is None:
+        style_blend = song.style_blend if song.style_blend is not None else 0.6
+
     dna = band_dna(db, db.get(Band, song.band_id))
     plan = songplan.plan_song(
         prompt=prompt, lyrics=lyrics, bpm=song.bpm, seed=seed, dna=dna,
         section_seconds=params.get("section_seconds"),
-        structure=params.get("structure"),
+        structure=params.get("structure"), genre=genre,
     )
 
     report_progress(db, job, 0.05, f"planned {len(plan['sections'])} sections")
@@ -144,6 +149,8 @@ def generate_full_song(
     song.lyrics = lyrics
     song.bpm = plan["bpm"]
     song.key = plan["key"]
+    song.genre = genre
+    song.style_blend = style_blend
     song.seed = seed
     song.duration = plan["duration"]
     song.status = "generating"
@@ -192,6 +199,7 @@ def generate_full_song(
             params={
                 "adapter_id": adapter_id, "duration": seconds,
                 "prompt": f"{sec['type']} - {prompt}",
+                "genre": genre, "style_blend": style_blend,
                 "energy_curve": [max(0.2, sec["energy"] - 0.15), sec["energy"], sec["energy"]],
             },
         )

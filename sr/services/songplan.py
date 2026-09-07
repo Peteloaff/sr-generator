@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from sr.common import genre as genre_mod
 from sr.common.seeds import derive_seed
 from sr.models.singer import Singer
 
@@ -48,6 +49,10 @@ def _scaffold_lines(prompt: str, n_lines: int, seed: int) -> list[str]:
     return lines
 
 
+_MINOR_KEYS = ["A minor", "E minor", "B minor", "D minor", "F# minor", "C minor"]
+_MAJOR_KEYS = ["C major", "G major", "D major", "A major", "E major", "F major"]
+
+
 def plan_song(
     *,
     prompt: str,
@@ -57,12 +62,27 @@ def plan_song(
     dna: dict | None = None,
     section_seconds: float | None = None,
     structure: list[str] | None = None,
+    genre: str | None = None,
 ) -> dict[str, Any]:
     dna = dna or {}
-    tpl = structure or _TEMPLATES[derive_seed(seed, "structure") % len(_TEMPLATES)]
-    bpm = float(bpm or (dna.get("bpm") or {}).get("median") or 120.0)
+    gb = genre_mod.plan_bias(genre, seed=seed, bpm=bpm) if genre else None
+
+    tpl = structure or (gb["structure"] if gb and gb["structure"] else None) \
+        or _TEMPLATES[derive_seed(seed, "structure") % len(_TEMPLATES)]
+    bpm = float(bpm or (gb["bpm"] if gb else None)
+                or (dna.get("bpm") or {}).get("median") or 120.0)
+
     key_dist = dna.get("key_distribution") or {}
-    key = next(iter(key_dist), None) or _KEYS[derive_seed(seed, "key") % len(_KEYS)]
+    if key_dist:
+        key = next(iter(key_dist))
+    elif gb and gb["mode"] == "minor":
+        key = _MINOR_KEYS[derive_seed(seed, "key") % len(_MINOR_KEYS)]
+    elif gb and gb["mode"] == "major":
+        key = _MAJOR_KEYS[derive_seed(seed, "key") % len(_MAJOR_KEYS)]
+    else:
+        key = _KEYS[derive_seed(seed, "key") % len(_KEYS)]
+
+    scale = gb["section_scale"] if gb else 1.0
     beat = 60.0 / bpm
 
     sections: list[dict] = []
@@ -70,13 +90,16 @@ def plan_song(
     chorus_i = 0
     for stype in tpl:
         bars = _BARS.get(stype, 8)
-        seconds = round(section_seconds or bars * 4 * beat, 3)
+        seconds = round((section_seconds or bars * 4 * beat) * scale, 3)
         name = None
         if stype == "chorus":
             chorus_i += 1
             name = f"Chorus {chorus_i}"
         elif stype == "verse":
             name = f"Verse {sum(1 for s in sections if s['type'] == 'verse') + 1}"
+        energy = _ENERGY.get(stype, 0.6)
+        if gb:
+            energy = min(gb["energy_ceiling"], max(gb["energy_floor"], energy))
         sections.append({
             "type": stype,
             "name": name,
@@ -84,7 +107,7 @@ def plan_song(
             "seconds": seconds,
             "start": round(cursor, 3),
             "end": round(cursor + seconds, 3),
-            "energy": _ENERGY.get(stype, 0.6),
+            "energy": round(energy, 3),
         })
         cursor += seconds
 
@@ -120,6 +143,7 @@ def plan_song(
         "prompt": prompt,
         "bpm": round(bpm, 2),
         "key": key,
+        "genre": genre,
         "template": tpl,
         "sections": sections,
         "lyric_lines": lines_out,

@@ -1102,10 +1102,60 @@ def stage13(client) -> list[Row]:
     return rows
 
 
+def stage14(client) -> list[Row]:
+    rows: list[Row] = []
+    try:
+        genres = client.get("/genres").json()
+        ids = {g["id"] for g in genres}
+        rows.append(("Genre presets are listed (metal, sludge, acoustic, ...)",
+                     {"metal", "sludge_metal", "doom_metal", "acoustic", "pop"} <= ids,
+                     f"{len(genres)} presets"))
+
+        slow = client.post("/songs", json={"title": "Doom", "genre": "doom_metal",
+                                           "seed": 4}).json()
+        fast = client.post("/songs", json={"title": "Thrash", "genre": "thrash_metal",
+                                           "seed": 4}).json()
+        rows.append(("A song stores its genre + style blend",
+                     slow["genre"] == "doom_metal" and 0.0 <= slow["style_blend"] <= 1.0, ""))
+
+        ds = client.post(f"/songs/{slow['id']}/generate", json={})
+        dj = client.post(f"/jobs/{ds.json()['id']}/wait", params={"timeout": 120}).json()
+        ts = client.post(f"/songs/{fast['id']}/generate", json={})
+        tj = client.post(f"/jobs/{ts.json()['id']}/wait", params={"timeout": 120}).json()
+        doom = client.get(f"/songs/{slow['id']}").json()
+        thrash = client.get(f"/songs/{fast['id']}").json()
+        rows.append(("Genre drives tempo + structure of the whole song",
+                     dj["status"] == "succeeded" and tj["status"] == "succeeded"
+                     and doom["bpm"] < 80 < thrash["bpm"],
+                     f"doom {doom['bpm']} vs thrash {thrash['bpm']} bpm"))
+
+        # same band, different feel -> audibly different masters
+        import hashlib
+
+        def master_hash(song_id):
+            a = [x for x in client.get(f"/songs/{song_id}/assets").json()
+                 if x["asset_type"] == "song_master"][0]
+            return hashlib.sha256(
+                client.get(f"/songs/{song_id}/assets/{a['id']}/download").content
+            ).hexdigest()
+
+        rows.append(("Different genres yield different renders",
+                     master_hash(slow["id"]) != master_hash(fast["id"]), ""))
+
+        # blend knob: 0 = ignore genre feel
+        acou = client.post("/songs", json={"title": "Acou", "genre": "acoustic",
+                                           "seed": 4, "style_blend": 0.0}).json()
+        rows.append(("style_blend=0 keeps the band's own feel",
+                     acou["style_blend"] == 0.0, ""))
+    except Exception as exc:  # noqa: BLE001
+        rows.append(("Genre / song feel", False, repr(exc)))
+    return rows
+
+
 STAGES = {
     "0": stage0, "1": stage1, "2": stage2, "3": stage3, "4": stage4,
     "5": stage5, "6": stage6, "7": stage7, "8": stage8, "9": stage9,
-    "10": stage10, "11": stage11, "12": stage12, "13": stage13,
+    "10": stage10, "11": stage11, "12": stage12, "13": stage13, "14": stage14,
 }
 
 

@@ -60,10 +60,17 @@ class LocalSynthMusicProvider(MusicGenerationProvider):
         bpm = params.get("bpm") or adapter.get("tempo_prior") or 120.0
         key = params.get("key") or adapter.get("key_prior") or "C major"
         seconds = float(params.get("duration", 8.0))
-        character = dict(adapter.get("character") or {})
-        for k in ("brightness", "drive", "drum_busy"):
+        # ``character`` is resolved by the caller (genre feel blended with the
+        # band adapter and any player styles); here we only apply explicit knobs.
+        character = dict(
+            params.get("character") or adapter.get("character") or {}
+        )
+        for k in ("brightness", "drive", "drum_busy", "distortion", "sustain",
+                  "sub_weight", "swing", "tuning_semitones"):
             if k in params:
                 character[k] = float(params[k])
+        if params.get("progressions"):
+            character["progressions"] = list(params["progressions"])
         energy = params.get("energy_curve") or adapter.get("energy_profile")
 
         out = musicgen.generate(

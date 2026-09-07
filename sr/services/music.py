@@ -12,6 +12,7 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from sr.common import genre as genre_mod
 from sr.common.storage import get_storage
 from sr.models.audio_asset import AudioAsset
 from sr.models.band import Band
@@ -77,6 +78,38 @@ def _section_key_bpm(section: SongSection, adapter_spec: dict) -> tuple[float | 
     return bpm, key
 
 
+_LERP_KEYS = (
+    "brightness", "drive", "drum_busy", "distortion", "sustain", "sub_weight", "swing",
+)
+
+
+def blend_character(genre_name: str | None, adapter_char: dict, blend: float) -> dict:
+    """Genre feel blended with the band's own character.
+
+    ``blend`` 0 = pure band adapter, 1 = pure genre. Numeric knobs are
+    interpolated; tuning and progressions come from the genre when it is set.
+    """
+    gc = genre_mod.character(genre_name) if genre_name else {}
+    ac = adapter_char or {}
+    if not gc:
+        return dict(ac)
+    b = max(0.0, min(1.0, blend))
+    out: dict = {}
+    for k in _LERP_KEYS:
+        gv, av = gc.get(k), ac.get(k)
+        if gv is None:
+            out[k] = av
+        elif av is None:
+            out[k] = gv
+        else:
+            out[k] = round(av * (1.0 - b) + gv * b, 4)
+    if "tuning_semitones" in gc:
+        out["tuning_semitones"] = gc["tuning_semitones"]
+    if gc.get("progressions"):
+        out["progressions"] = list(gc["progressions"])
+    return out
+
+
 def generate_instrumental(
     db: Session, job: GenerationJob, *, section_id: str, seed: int, params: dict
 ) -> ProviderResult:
@@ -99,8 +132,14 @@ def generate_instrumental(
     seconds = float(seconds or 8.0)
 
     bpm, key = _section_key_bpm(section, adapter_spec)
+    genre_name = params.get("genre") or getattr(song, "genre", None)
+    character = blend_character(
+        genre_name, adapter_spec.get("character") or {},
+        float(params.get("style_blend", 0.6)),
+    )
     gen_params = {
         "duration": seconds,
+        "character": character,
         **({"bpm": params["bpm"]} if params.get("bpm") else ({"bpm": bpm} if bpm else {})),
         **({"key": params["key"]} if params.get("key") else ({"key": key} if key else {})),
     }
