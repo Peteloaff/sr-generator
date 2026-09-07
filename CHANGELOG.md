@@ -1,5 +1,26 @@
 # Changelog
 
+## [Stage 12] Instrumentalist players roster — 2026-09-07
+
+First slice of the "AI band members" epic: instrumentalists alongside singers.
+Upcoming stages add style-learning from uploaded songs (Demucs separation), per-
+section instrument casting, and generation conditioned on each player's profile.
+
+### Added
+- **`Player` model** (`sr/models/player.py`) — the instrument-side analogue of
+  `Singer`: `band_id`, `name`, `role` (`lead_guitar` / `rhythm_guitar` / `bass`
+  / `drums` / `keys`), a learned `style_profile_json`, `training_status`, an
+  `intensity` bias, and the same consent flags (`consent_training` /
+  `_generation` / `_commercial`) enforced before any training or render.
+- **`/players` CRUD router** — band-scoped list (optional `?role=` filter),
+  create (unique name per band, 409 on dup, 422 on bad role), get, patch,
+  delete. `Band.players` relationship cascades on band delete.
+- `PlayerRole` enum; `player_sample` / `player_stem` asset types; `train_player`
+  job type (handler lands in Stage 13). `/bands/{id}/stats` now reports
+  `players`.
+- Migration `a1c7f4e02b19`; `scripts/stage_gate.py 12`; `tests/test_players.py`
+  (6 tests, 149 total).
+
 ## [UX] Guided song workflow, redesign, and in-browser voice recording — 2026-09-01
 
 The web app was a working but utilitarian set of CRUD tables. This pass makes it

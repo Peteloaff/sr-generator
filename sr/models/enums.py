@@ -39,6 +39,14 @@ class VocalRoleType(StrEnum):
     SCREAM = "scream"
 
 
+class PlayerRole(StrEnum):
+    LEAD_GUITAR = "lead_guitar"
+    RHYTHM_GUITAR = "rhythm_guitar"
+    BASS = "bass"
+    DRUMS = "drums"
+    KEYS = "keys"
+
+
 class TrainingStatus(StrEnum):
     NONE = "none"
     QUEUED = "queued"
@@ -60,6 +68,7 @@ class JobType(StrEnum):
     MIX = "mix"
     MASTER = "master"
     TRAIN_SINGER = "train_singer"
+    TRAIN_PLAYER = "train_player"
     TRAIN_BAND_ADAPTER = "train_band_adapter"
     GENERATE_SONG = "generate_song"
     REGENERATE_SECTION = "regenerate_section"
@@ -80,6 +89,8 @@ class AssetType(StrEnum):
     REFERENCE = "reference"
     GUIDE_VOCAL = "guide_vocal"  # one melody/phrase per section, converted per singer
     SINGER_SAMPLE = "singer_sample"  # training-input audio for a singer's voice model
+    PLAYER_SAMPLE = "player_sample"  # training-input audio for a player's style model
+    PLAYER_STEM = "player_stem"  # a player's instrument, separated out of a sample
     CONVERTED_VOCAL = "converted_vocal"  # a voice-converted guide (cached base per singer)
     SOURCE_TAKE = "source_take"  # a singer's recorded take of a section
     INSTRUMENTAL_BED = "instrumental_bed"  # section instrumental supplied for mixing

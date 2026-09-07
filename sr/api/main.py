@@ -18,6 +18,7 @@ from sr.api.routers import (
     jobs,
     morph,
     music,
+    players,
     presets,
     projects,
     references,
@@ -64,7 +65,7 @@ def create_app() -> FastAPI:
 
     api_prefix = "/api" if settings.serve_frontend else ""
     for module in (
-        health, bands, singers, voice_models, references, projects, songs,
+        health, bands, singers, players, voice_models, references, projects, songs,
         vocal, presets, render, song_edit, music, compose, regen, arranger,
         morph, jobs,
     ):

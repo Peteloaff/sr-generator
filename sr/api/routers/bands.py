@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from sr.bootstrap import ensure_default_band
 from sr.db import get_db
 from sr.models.band import Band
+from sr.models.player import Player
 from sr.models.project import Project
 from sr.models.singer import Singer
 from sr.schemas.band import BandCreate, BandRead, BandUpdate
@@ -56,10 +57,11 @@ def band_stats(band_id: str, db: Session = Depends(get_db)) -> dict:
     if db.get(Band, band_id) is None:
         raise HTTPException(404, "band not found")
     singers = db.scalar(select(func.count()).select_from(Singer).where(Singer.band_id == band_id))
+    players = db.scalar(select(func.count()).select_from(Player).where(Player.band_id == band_id))
     projects = db.scalar(
         select(func.count()).select_from(Project).where(Project.band_id == band_id)
     )
-    return {"band_id": band_id, "singers": singers, "projects": projects}
+    return {"band_id": band_id, "singers": singers, "players": players, "projects": projects}
 
 
 @router.patch("/{band_id}", response_model=BandRead)

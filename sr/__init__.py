@@ -6,8 +6,10 @@ stems + master (Stage 8). Any section, role, or singer regenerates in isolation
 with revision history and rollback (Stage 9). The arranger recommends a complete,
 editable vocal map from singer metadata and section energy without ever
 clobbering manual work (Stage 10). Experimental vocal morphing lives behind
-SR_EXPERIMENTAL_MORPH with quality gating (Stage 11). Every model is a swappable
-provider. See ROADMAP.md.
+SR_EXPERIMENTAL_MORPH with quality gating (Stage 11). Stage 12 opens the
+instrumentalist-players epic: a named roster of AI band members (guitar / bass /
+drums / keys) whose style is learned from real recordings. Every model is a
+swappable provider. See ROADMAP.md.
 """
 
-__version__ = "0.12.0"
+__version__ = "0.13.0"

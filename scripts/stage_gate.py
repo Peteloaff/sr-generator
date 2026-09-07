@@ -995,10 +995,46 @@ def stage11(client) -> list[Row]:
     return rows
 
 
+def stage12(client) -> list[Row]:
+    rows: list[Row] = []
+    client.get("/bands").json()
+    try:
+        dave = client.post("/players", json={"name": "Dave", "role": "lead_guitar"})
+        client.post("/players", json={"name": "John", "role": "drums"})
+        rows.append(("A player is created with a name + instrument role",
+                     dave.status_code == 201 and dave.json()["role"] == "lead_guitar"
+                     and dave.json()["training_status"] == "none",
+                     dave.json().get("id", dave.text)[:12]))
+
+        bad = client.post("/players", json={"name": "X", "role": "kazoo"})
+        rows.append(("An unknown instrument role is rejected", bad.status_code == 422, ""))
+
+        dup = client.post("/players", json={"name": "Dave", "role": "bass"})
+        rows.append(("Duplicate player name in a band is rejected", dup.status_code == 409, ""))
+
+        gtr = client.get("/players", params={"role": "lead_guitar"}).json()
+        rows.append(("Roster filters by instrument role",
+                     [p["name"] for p in gtr] == ["Dave"], f"{len(gtr)} lead guitarist(s)"))
+
+        b2 = client.post("/bands", json={"name": "Other Band"}).json()["id"]
+        client.post("/players", json={"name": "Dave", "role": "keys"},
+                    headers={"X-Band-Id": b2})
+        mine = [p["name"] for p in client.get("/players").json()]
+        rows.append(("Players are scoped per band",
+                     mine == ["John", "Dave"] or sorted(mine) == ["Dave", "John"],
+                     f"band 1: {mine}"))
+
+        stats = client.get(f"/bands/{b2}/stats").json()
+        rows.append(("Band stats count players", stats.get("players") == 1, str(stats)))
+    except Exception as exc:  # noqa: BLE001
+        rows.append(("Players roster", False, repr(exc)))
+    return rows
+
+
 STAGES = {
     "0": stage0, "1": stage1, "2": stage2, "3": stage3, "4": stage4,
     "5": stage5, "6": stage6, "7": stage7, "8": stage8, "9": stage9,
-    "10": stage10, "11": stage11,
+    "10": stage10, "11": stage11, "12": stage12,
 }
 
 

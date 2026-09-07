@@ -25,6 +25,9 @@ class Band(UUIDPrimaryKey, Timestamps, Base):
     singers: Mapped[list[Singer]] = relationship(  # noqa: F821
         back_populates="band", cascade="all, delete-orphan"
     )
+    players: Mapped[list[Player]] = relationship(  # noqa: F821
+        back_populates="band", cascade="all, delete-orphan"
+    )
     projects: Mapped[list[Project]] = relationship(  # noqa: F821
         back_populates="band", cascade="all, delete-orphan"
     )
