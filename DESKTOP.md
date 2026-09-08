@@ -20,10 +20,22 @@ All data lives in `~/.sr-generator` (`C:\Users\<you>\.sr-generator`):
 
 | Path | What |
 |---|---|
-| `sr.db` | the SQLite database (songs, singers, sections, jobs) |
+| `sr.db` | the SQLite database (songs, singers, players, sections, jobs) |
 | `storage/` | generated + uploaded audio |
+| `pydeps/` | the separation engine (Demucs), installed on first use — see below |
 
 Delete that folder for a clean slate. Back it up to keep your work.
+
+### Learning a player's style (Demucs, first use only)
+
+Per-instrument separation uses **Demucs** (PyTorch, ~2 GB). It is **not**
+bundled — the first time you train a player, the app installs it into
+`~/.sr-generator/pydeps` (needs a system Python 3.12+ on PATH and a network
+connection). That one download takes a few minutes; every run after is instant.
+
+If you don't have Python or want to skip it, set `SR_MULTISTEM_PROVIDER=bandsplit`
+for the rough dependency-free split (fine for a quick pass, not for real tone
+matching).
 
 ### Overrides (optional)
 

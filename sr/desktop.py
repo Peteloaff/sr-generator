@@ -62,6 +62,11 @@ def _configure_env() -> tuple[Path, Path]:
     os.environ.setdefault("SR_QUEUE_BACKEND", "inline")
     os.environ.setdefault("SR_FRONTEND_DIR", str(_frontend_dir(res)))
     os.environ.setdefault("SR_API_CORS_ORIGINS", "http://127.0.0.1,http://localhost")
+    # Real per-instrument separation (Demucs) is installed on first use into
+    # <data>/pydeps rather than bundled - keeps the .exe small.
+    os.environ.setdefault("SR_MULTISTEM_PROVIDER", "demucs")
+    os.environ.setdefault("SR_AUTO_INSTALL_SEPARATION", "1")
+    (data / "pydeps").mkdir(parents=True, exist_ok=True)
     return res, data
 
 

@@ -36,13 +36,11 @@ def _get_separator(model: str):
     global _SEPARATOR
     with _LOCK:
         if _SEPARATOR is None or getattr(_SEPARATOR, "_sr_model", None) != model:
-            try:
-                from demucs.api import Separator
-            except ImportError as exc:  # pragma: no cover - depends on optional extra
-                raise RuntimeError(
-                    "Demucs is not installed. Install the separation extra:\n"
-                    '  pip install "sr-generator[separation]"'
-                ) from exc
+            from sr.common.deps import ensure_separation
+
+            ensure_separation()  # import Demucs, or install it on first use
+            from demucs.api import Separator
+
             # shifts=0: no random shift augmentation, so separation is
             # reproducible run-to-run (required for deterministic style learning).
             sep = Separator(model=model, progress=False, shifts=0)

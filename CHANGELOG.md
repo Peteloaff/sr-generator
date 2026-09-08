@@ -1,5 +1,27 @@
 # Changelog
 
+## [Stage 18] Band lineup + one-click casting — 2026-09-08
+
+Assemble singers + players into a band and cast them onto a song in one click.
+
+### Added
+- **`GET /bands/{id}/lineup`** — the whole roster: vocalists + players by
+  instrument, with fill status.
+- **`POST /songs/{id}/cast-band`** — puts the band's go-to player (most-trained,
+  consenting) on every instrument slot, then runs the Stage 10 vocal arranger.
+  Individual per-part / per-section casting still overrides it.
+- Web: a **`/band` page** (unified "Your Band" — lineup summary + all singer &
+  player cards) and a **"Cast the whole band"** button in the Cast step. Nav
+  consolidated (`Singers` + `Players` → `Band`).
+- `scripts/stage_gate.py 18`; `tests/test_band_casting.py`.
+
+### Changed
+- **Demucs installs on first use**, not bundled. The desktop app sets
+  `SR_AUTO_INSTALL_SEPARATION=1`; `sr/common/deps.py` pip-installs `demucs` into
+  `~/.sr-generator/pydeps` the first time a player is trained (needs a system
+  Python). Falls back to a clear error / `bandsplit` otherwise.
+  `tests/test_deps.py` (179 tests total).
+
 ## [Stage 17] Google Drive folder source — 2026-09-07
 
 Pull reference songs and player training material from a Google Drive folder,
