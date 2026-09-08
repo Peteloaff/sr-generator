@@ -48,9 +48,23 @@ export default function Home() {
       <section className="hero">
         <h1>Make a song with your band.</h1>
         <p className="lede">
-          Write the words and the vibe, cast your singers on every section, then
-          generate a full, editable track — stems and all.
+          Write the words and the vibe, cast your singers and players on every
+          section, then generate a full, editable track — stems and all.
         </p>
+        <div className="row tight" style={{ marginTop: "0.9rem" }}>
+          <a
+            className="btn primary"
+            href="https://github.com/Peteloaff/sr-generator/releases/latest/download/SR-Generator-desktop.zip"
+          >
+            ↓ Download for Windows
+          </a>
+          <Link href="/download" className="btn ghost sm">
+            how it works &amp; setup
+          </Link>
+          <Link href="/help" className="btn ghost sm">
+            walkthrough
+          </Link>
+        </div>
       </section>
 
       <div className="card pad-lg">
