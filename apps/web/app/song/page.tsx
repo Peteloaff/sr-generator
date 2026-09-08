@@ -21,6 +21,7 @@ import CoverStudio from "@/components/CoverStudio";
 import GeneratePanel from "@/components/GeneratePanel";
 import ArrangerPanel from "@/components/ArrangerPanel";
 import SingerCard from "@/components/SingerCard";
+import InstrumentCast from "@/components/InstrumentCast";
 
 type Step = "story" | "cast" | "studio";
 
@@ -385,6 +386,8 @@ function CastStep({
           </div>
         )}
       </div>
+
+      <InstrumentCast songId={songId} onChange={onChange} />
 
       {sections.length === 0 ? (
         <div className="empty">Generate the song on the Story step first to get sections to cast.</div>

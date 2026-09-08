@@ -1,5 +1,29 @@
 # Changelog
 
+## [Stage 16] Web UI for players, genre & casting — 2026-09-07
+
+Stages 12-15 are now usable from the app.
+
+### Added
+- **Players page** (`/players`) + **`PlayerCard`** — add a player (name +
+  instrument), upload songs / record a part, learn style, consent toggles, and a
+  "tune by hand" panel (drive / brightness / busyness / attack / sustain /
+  swing). Grouped by instrument. Nav gained a **Players** link.
+- **`GeneratePanel`** gained a **genre / feel** picker (from `/genres`) and a
+  "how far toward the genre" blend slider; both persist on the song and pass
+  into generation.
+- **`InstrumentCast`** in the Cast step — one row per instrument with a player
+  dropdown (filtered to that instrument), a mute toggle, and a "tweak" panel
+  (explore knob + the five dials: sparser↔busier, darker↔brighter,
+  softer↔harder, laid-back↔pushed, straight↔swung). Warns when a chosen player
+  hasn't granted generation consent.
+- `lib/api.ts`: `Player` / `StyleModel` / `Genre` / `InstrumentSlot` types and
+  the `/players`, `/genres`, `/songs/{id}/instruments` methods; `Song` gained
+  `genre` / `style_blend`.
+- Verified end to end in a browser against a live API: create player, cast on a
+  song, regenerate a section -> the render's `cast` names the player and the
+  four instrument stems come out.
+
 ## [Stage 15] Instrument casting — 2026-09-07
 
 Cast a trained player on each instrument, per song or per section; generation is

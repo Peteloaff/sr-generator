@@ -72,6 +72,36 @@ export interface Song {
   id: string; band_id: string; project_id: string | null; title: string;
   status: string; bpm: number | null; key: string | null; duration: number | null; seed: number | null;
   prompt: string | null; lyrics: string | null;
+  genre: string | null; style_blend: number;
+}
+
+export const PLAYER_ROLES = [
+  "lead_guitar", "rhythm_guitar", "bass", "drums", "keys",
+] as const;
+export type PlayerRole = (typeof PLAYER_ROLES)[number];
+export const PLAYER_ROLE_LABEL: Record<PlayerRole, string> = {
+  lead_guitar: "Lead guitar", rhythm_guitar: "Rhythm guitar",
+  bass: "Bass", drums: "Drums", keys: "Keys",
+};
+
+export interface Player {
+  id: string; band_id: string; name: string; role: PlayerRole;
+  display_name: string | null; notes: string | null; intensity: number | null;
+  style_model_provider: string | null;
+  style_profile_json: Record<string, number | string> | null;
+  training_status: string; training_samples: number; is_active: boolean;
+  consent_training: boolean; consent_generation: boolean; consent_commercial: boolean;
+}
+export interface StyleModel {
+  player_id: string; role: string; training_status: string; training_samples: number;
+  style_model_provider: string | null;
+  style_profile: Record<string, number | string> | null;
+}
+export interface Genre { id: string; label: string }
+export interface InstrumentSlot {
+  id: string; song_id: string; section_id: string | null; role: PlayerRole;
+  player_id: string | null; muted: boolean; gain_db: number; explore: number;
+  dials_json: Record<string, number> | null;
 }
 export interface Project { id: string; band_id: string; name: string; description: string | null }
 export interface Section {
@@ -178,6 +208,39 @@ export const api = {
     req<Singer>(`/singers/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
   deleteSinger: (id: string) => req<void>(`/singers/${id}`, { method: "DELETE" }),
 
+  // Stage 12-13 - instrumentalist players
+  listPlayers: () => req<Player[]>("/players"),
+  createPlayer: (name: string, role: PlayerRole) =>
+    req<Player>("/players", { method: "POST", body: JSON.stringify({ name, role }) }),
+  updatePlayer: (id: string, patch: Partial<Player>) =>
+    req<Player>(`/players/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
+  deletePlayer: (id: string) => req<void>(`/players/${id}`, { method: "DELETE" }),
+  getStyleModel: (id: string) => req<StyleModel>(`/players/${id}/style-model`),
+  listPlayerSamples: (id: string) => req<AudioAsset[]>(`/players/${id}/samples`),
+  uploadPlayerSample: (id: string, file: File) =>
+    upload<AudioAsset>(`/players/${id}/samples`, file),
+  deletePlayerSample: (id: string, assetId: string) =>
+    req<void>(`/players/${id}/samples/${assetId}`, { method: "DELETE" }),
+  trainStyleModel: (id: string) =>
+    req<Job>(`/players/${id}/style-model/train`, { method: "POST" }),
+  setStyleProfile: (id: string, patch: Record<string, number>) =>
+    req<StyleModel>(`/players/${id}/style-model`, { method: "PATCH", body: JSON.stringify(patch) }),
+
+  // Stage 14 - genre / song feel
+  listGenres: () => req<Genre[]>("/genres"),
+
+  // Stage 15 - instrument casting
+  listInstruments: (songId: string) => req<InstrumentSlot[]>(`/songs/${songId}/instruments`),
+  setInstrument: (songId: string, body: {
+    role: PlayerRole; section_id?: string | null; player_id?: string | null;
+    muted?: boolean; gain_db?: number; explore?: number;
+    dials?: Record<string, number>;
+  }) => req<InstrumentSlot>(`/songs/${songId}/instruments`, {
+    method: "PUT", body: JSON.stringify(body),
+  }),
+  clearInstrument: (songId: string, slotId: string) =>
+    req<void>(`/songs/${songId}/instruments/${slotId}`, { method: "DELETE" }),
+
   listProjects: () => req<Project[]>("/projects"),
   createProject: (name: string) => req<Project>("/projects", { method: "POST", body: JSON.stringify({ name }) }),
   exportProject: (id: string) => req<unknown>(`/projects/${id}/export`),
@@ -187,7 +250,10 @@ export const api = {
   listSongs: () => req<Song[]>("/songs"),
   createSong: (
     title: string,
-    extra: { prompt?: string; lyrics?: string; bpm?: number; key?: string; seed?: number } = {},
+    extra: {
+      prompt?: string; lyrics?: string; bpm?: number; key?: string; seed?: number;
+      genre?: string | null; style_blend?: number;
+    } = {},
   ) => req<Song>("/songs", { method: "POST", body: JSON.stringify({ title, ...extra }) }),
   getSong: (id: string) => req<Song>(`/songs/${id}`),
   updateSong: (id: string, patch: Partial<Song>) =>
@@ -288,7 +354,8 @@ export const api = {
     songId: string,
     sectionId: string,
     body: { prompt?: string; seed?: number | null; adapter_id?: string | null;
-            bpm?: number | null; key?: string | null; duration?: number | null } = {},
+            bpm?: number | null; key?: string | null; duration?: number | null;
+            genre?: string | null; style_blend?: number } = {},
   ) =>
     req<Job>(`/songs/${songId}/sections/${sectionId}/generate-instrumental`, {
       method: "POST",
@@ -304,7 +371,10 @@ export const api = {
     ),
   generateFullSong: (
     songId: string,
-    body: { prompt?: string; lyrics?: string; seed?: number; adapter_id?: string },
+    body: {
+      prompt?: string; lyrics?: string; seed?: number; adapter_id?: string;
+      genre?: string | null; style_blend?: number;
+    },
   ) =>
     req<Job>(`/songs/${songId}/generate`, { method: "POST", body: JSON.stringify(body) }),
   listFullSongJobs: (songId: string) => req<Job[]>(`/songs/${songId}/generations`),
