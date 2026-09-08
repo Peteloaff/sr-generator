@@ -80,8 +80,24 @@ function RoleCard({
   onChanged: () => void;
 }) {
   const [shares, setShares] = useState<NormalizedShare[]>([]);
+  // live slider positions, committed to the API on release
+  const [draft, setDraft] = useState<Record<string, { gain_db?: number; pan?: number }>>({});
   const name = (id: string) => singers.find((s) => s.id === id)?.name ?? "?";
   const showInterval = INTERVAL_ROLES.has(role.role_type);
+
+  const mixVal = (a: { id: string; gain_db: number; pan: number }, key: "gain_db" | "pan") =>
+    draft[a.id]?.[key] ?? a[key];
+  const setMix = (id: string, key: "gain_db" | "pan", v: number) =>
+    setDraft((d) => ({ ...d, [id]: { ...d[id], [key]: v } }));
+  const commitMix = (id: string, key: "gain_db" | "pan", v: number) =>
+    api.updateAssignment(id, { [key]: v }).then(() => {
+      setDraft((d) => {
+        const next = { ...d };
+        delete next[id];
+        return next;
+      });
+      onChanged();
+    });
 
   const refreshShares = useCallback(() => api.normalized(role.id).then(setShares), [role.id]);
   useEffect(() => {
@@ -164,6 +180,49 @@ function RoleCard({
                     st
                   </td>
                 )}
+                <td style={{ whiteSpace: "nowrap" }}>
+                  <span className="faint" style={{ fontSize: "0.72rem" }}>vol</span>{" "}
+                  <input
+                    type="range"
+                    min={-18}
+                    max={6}
+                    step={0.5}
+                    value={mixVal(a, "gain_db")}
+                    title={`${mixVal(a, "gain_db") > 0 ? "+" : ""}${mixVal(a, "gain_db")} dB`}
+                    style={{ width: 80, verticalAlign: "middle" }}
+                    onChange={(e) => setMix(a.id, "gain_db", Number(e.target.value))}
+                    onPointerUp={(e) => commitMix(a.id, "gain_db", Number((e.target as HTMLInputElement).value))}
+                    onKeyUp={(e) => commitMix(a.id, "gain_db", Number((e.target as HTMLInputElement).value))}
+                  />{" "}
+                  <span className="faint" style={{ fontSize: "0.72rem", width: 34, display: "inline-block" }}>
+                    {mixVal(a, "gain_db") > 0 ? "+" : ""}
+                    {mixVal(a, "gain_db")}
+                  </span>
+                </td>
+                <td style={{ whiteSpace: "nowrap" }}>
+                  <span className="faint" style={{ fontSize: "0.72rem" }}>pan</span>{" "}
+                  <input
+                    type="range"
+                    min={-100}
+                    max={100}
+                    step={5}
+                    value={mixVal(a, "pan")}
+                    title={
+                      mixVal(a, "pan") === 0
+                        ? "centre"
+                        : `${Math.abs(mixVal(a, "pan"))}% ${mixVal(a, "pan") < 0 ? "L" : "R"}`
+                    }
+                    style={{ width: 80, verticalAlign: "middle" }}
+                    onChange={(e) => setMix(a.id, "pan", Number(e.target.value))}
+                    onPointerUp={(e) => commitMix(a.id, "pan", Number((e.target as HTMLInputElement).value))}
+                    onKeyUp={(e) => commitMix(a.id, "pan", Number((e.target as HTMLInputElement).value))}
+                  />{" "}
+                  <span className="faint" style={{ fontSize: "0.72rem", width: 34, display: "inline-block" }}>
+                    {mixVal(a, "pan") === 0
+                      ? "C"
+                      : `${Math.abs(mixVal(a, "pan"))}${mixVal(a, "pan") < 0 ? "L" : "R"}`}
+                  </span>
+                </td>
                 <td className="muted">
                   = {share ? share.normalized_percent.toFixed(1) : "…"}%
                   {ENSEMBLE_ROLES.has(role.role_type) && share

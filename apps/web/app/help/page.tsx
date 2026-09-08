@@ -78,19 +78,55 @@ export default function HelpPage() {
         </li>
 
         <li>
-          <h3>6 · Cast the band</h3>
+          <h3>6 · Cast the players</h3>
           <p>
             On the <b>Cast</b> step, hit <b>Cast the whole band</b> — it puts each
             member on their part and arranges the singers. Or set each instrument
             yourself from its dropdown. Open <b>tweak</b> on any instrument for the
             dials (sparser↔busier, darker↔brighter, softer↔harder, laid-back↔pushed,
             straight↔swung) and the <b>explore</b> knob — 0 stays true to the
-            learned style, higher lets them try new things.
+            learned style, higher lets them try new things. Set an instrument to{" "}
+            <b>mute</b> to drop it from the song.
           </p>
         </li>
 
         <li>
-          <h3>7 · Generate & edit</h3>
+          <h3>7 · Vocal arrangement &amp; mix</h3>
+          <p>
+            Still on <b>Cast</b>, under <b>Sections</b>, hit <b>edit cast</b> on a
+            section (a chorus, say) to build the vocal stack:
+          </p>
+          <ul>
+            <li>
+              <b>add role</b> → pick <b>lead</b> (one voice), <b>background</b>{" "}
+              (blended stack), <b>gang</b> (unison shout), <b>harmony</b> /{" "}
+              <b>double</b> (pitched — set each singer&apos;s interval in
+              semitones: +3/+4 a third, +7 a fifth, −12 an octave down).
+            </li>
+            <li>
+              <b>ensemble</b> = how many stacked takes (8 / 12 / 16). <b>width</b>{" "}
+              spreads them in stereo.
+            </li>
+            <li>
+              Add singers to the role. Each singer&apos;s <b>%</b> is an{" "}
+              <i>allocation</i>, not a fader — it decides how many of the takes
+              they sing (e.g. 50 / 30 / 20 on an ensemble of 10 → 5 / 3 / 2
+              takes).
+            </li>
+            <li>
+              Each singer also has a <b>vol</b> (−18…+6 dB) and <b>pan</b>{" "}
+              (L↔R) slider for the actual mix, plus a per-role <b>fx</b> chain
+              (de-esser / EQ / compressor).
+            </li>
+          </ul>
+          <p>
+            A typical chorus = one <b>lead</b> role + one <b>background</b> role +
+            a <b>harmony</b> or two. Per-line overrides sit below the sections.
+          </p>
+        </li>
+
+        <li>
+          <h3>8 · Generate & edit</h3>
           <p>
             Hit <b>Generate song</b>. On the <b>Studio</b> step you get the full
             mix, a master, and every instrument and vocal as its own stem. Open a

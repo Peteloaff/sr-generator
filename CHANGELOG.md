@@ -1,5 +1,13 @@
 # Changelog
 
+## Per-singer volume & pan in the Vocal Director — 2026-09-08
+
+Each singer in a vocal role now has a **vol** (−18…+6 dB) and **pan** (L↔R)
+slider next to its take-allocation %. They commit on release and feed straight
+into the render (`layering.py` already passed `gain_db` / `pan` through to the
+take specs — this just exposes them). The Help page gained a "Vocal arrangement
+& mix" step covering roles, ensembles, harmony intervals, and the mix controls.
+
 ## [Stage 19] Signature style presets + Help + band identity — 2026-09-08
 
 ### Added
