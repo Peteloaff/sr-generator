@@ -1,18 +1,22 @@
-"""Instrument casting: which player performs which instrument, per song/section."""
+"""Instrument casting: which player performs which instrument, per song/section,
+plus one-click "cast the whole band"."""
 
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from sr.db import get_db
+from sr.models.band import Band
 from sr.models.instrument_slot import InstrumentSlot
 from sr.models.player import Player
 from sr.models.song import Song, SongSection
 from sr.schemas.casting import InstrumentSlotRead, InstrumentSlotWrite
+from sr.services.casting import band_lineup, cast_band
 
-router = APIRouter(prefix="/songs", tags=["casting"])
+router = APIRouter(tags=["casting"])
 
 
 def _song(db: Session, song_id: str) -> Song:
@@ -22,7 +26,32 @@ def _song(db: Session, song_id: str) -> Song:
     return song
 
 
-@router.get("/{song_id}/instruments", response_model=list[InstrumentSlotRead])
+@router.get("/bands/{band_id}/lineup")
+def get_lineup(band_id: str, db: Session = Depends(get_db)) -> dict:
+    if db.get(Band, band_id) is None:
+        raise HTTPException(404, "band not found")
+    return band_lineup(db, band_id)
+
+
+class CastBandRequest(BaseModel):
+    overwrite: bool = False
+    seed: int | None = None
+
+
+@router.post("/songs/{song_id}/cast-band")
+def cast_whole_band(
+    song_id: str, body: CastBandRequest, db: Session = Depends(get_db)
+) -> dict:
+    song = _song(db, song_id)
+    result = cast_band(
+        db, song, overwrite=body.overwrite,
+        seed=body.seed if body.seed is not None else (song.seed or 0),
+    )
+    db.commit()
+    return result
+
+
+@router.get("/songs/{song_id}/instruments", response_model=list[InstrumentSlotRead])
 def list_instruments(song_id: str, db: Session = Depends(get_db)) -> list[InstrumentSlot]:
     _song(db, song_id)
     return list(
@@ -34,7 +63,7 @@ def list_instruments(song_id: str, db: Session = Depends(get_db)) -> list[Instru
     )
 
 
-@router.put("/{song_id}/instruments", response_model=InstrumentSlotRead)
+@router.put("/songs/{song_id}/instruments", response_model=InstrumentSlotRead)
 def set_instrument(
     song_id: str, payload: InstrumentSlotWrite, db: Session = Depends(get_db)
 ) -> InstrumentSlot:
@@ -75,7 +104,7 @@ def set_instrument(
     return slot
 
 
-@router.delete("/{song_id}/instruments/{slot_id}", status_code=204)
+@router.delete("/songs/{song_id}/instruments/{slot_id}", status_code=204)
 def clear_instrument(song_id: str, slot_id: str, db: Session = Depends(get_db)) -> None:
     slot = db.get(InstrumentSlot, slot_id)
     if slot is None or slot.song_id != song_id:

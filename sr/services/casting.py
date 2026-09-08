@@ -14,8 +14,9 @@ from sqlalchemy.orm import Session
 from sr.common.playerstyle import StyleProfile
 from sr.common.seeds import bounded_jitter, derive_seed
 from sr.models.instrument_slot import InstrumentSlot
-from sr.models.player import Player
-from sr.models.song import SongSection
+from sr.models.player import PLAYER_ROLES, Player
+from sr.models.singer import Singer
+from sr.models.song import Song, SongSection
 
 # dial name -> (style-profile field it pushes, how far a full dial moves it)
 _DIAL_TARGET = {
@@ -88,3 +89,88 @@ def resolve_section_players(db: Session, section: SongSection, *, seed: int) -> 
         eff["player_name"] = player.name
         out[role] = eff
     return out
+
+
+def band_lineup(db: Session, band_id: str) -> dict:
+    """A band's whole roster - vocalists + players by instrument."""
+    singers = list(
+        db.scalars(select(Singer).where(Singer.band_id == band_id).order_by(Singer.name))
+    )
+    players = list(
+        db.scalars(select(Player).where(Player.band_id == band_id).order_by(Player.name))
+    )
+    by_role = {r: [p for p in players if p.role == r] for r in PLAYER_ROLES}
+    return {
+        "band_id": band_id,
+        "singers": [
+            {
+                "id": s.id, "name": s.name, "training_status": s.training_status,
+                "consent_generation": s.consent_generation,
+            }
+            for s in singers
+        ],
+        "players": {
+            role: [
+                {
+                    "id": p.id, "name": p.name, "training_status": p.training_status,
+                    "training_samples": p.training_samples,
+                    "consent_generation": p.consent_generation,
+                }
+                for p in ps
+            ]
+            for role, ps in by_role.items()
+        },
+        "roles_filled": {
+            role: any(p.consent_generation for p in ps) for role, ps in by_role.items()
+        },
+        "vocals_ready": any(s.consent_generation for s in singers),
+    }
+
+
+def _pick_player(players: list[Player]) -> Player | None:
+    """The band's go-to player for a role: most-trained, then trained-status, then name."""
+    ok = [p for p in players if p.consent_generation]
+    if not ok:
+        return None
+    return sorted(
+        ok,
+        key=lambda p: (-p.training_samples, p.training_status != "ready", p.name),
+    )[0]
+
+
+def cast_band(db: Session, song: Song, *, overwrite: bool, seed: int) -> dict:
+    """One-click: put the band's players on every instrument + arrange the singers."""
+    players = list(db.scalars(select(Player).where(Player.band_id == song.band_id)))
+    by_role = {r: [p for p in players if p.role == r] for r in PLAYER_ROLES}
+
+    assigned: dict[str, str] = {}
+    for role, pool in by_role.items():
+        chosen = _pick_player(pool)
+        if chosen is None:
+            continue
+        slot = db.scalar(
+            select(InstrumentSlot).where(
+                InstrumentSlot.song_id == song.id,
+                InstrumentSlot.role == role,
+                InstrumentSlot.section_id.is_(None),
+            )
+        )
+        if slot is not None and slot.player_id and not overwrite:
+            assigned[role] = "kept"
+            continue
+        if slot is None:
+            slot = InstrumentSlot(song_id=song.id, role=role)
+            db.add(slot)
+        slot.player_id = chosen.id
+        slot.muted = False
+        assigned[role] = chosen.name
+    db.flush()
+
+    vocals = None
+    if song.sections:
+        from sr.services.arranger import apply_arrangement
+
+        vocals = apply_arrangement(
+            db, song, section_ids=None, overwrite=overwrite, seed=seed
+        )
+    return {"song_id": song.id, "players": assigned, "vocals": vocals}

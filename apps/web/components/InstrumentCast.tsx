@@ -29,6 +29,8 @@ export default function InstrumentCast({
   const [players, setPlayers] = useState<Player[]>([]);
   const [slots, setSlots] = useState<InstrumentSlot[]>([]);
   const [open, setOpen] = useState<PlayerRole | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -69,18 +71,43 @@ export default function InstrumentCast({
     }
   };
 
+  const castTheBand = async () => {
+    setBusy(true);
+    setErr(null);
+    setNote(null);
+    try {
+      const r = await api.castBand(songId, true);
+      const filled = Object.entries(r.players)
+        .map(([role, name]) => `${role.replace(/_/g, " ")}: ${name}`)
+        .join(" · ");
+      setNote(filled ? `Cast ${filled}` : "No trained players to cast yet — add some on the Band page.");
+      await load();
+      onChange?.();
+    } catch (e) {
+      setErr(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="card">
       <div className="row space tight">
         <h3 style={{ margin: 0 }}>Instruments</h3>
-        <Link href="/players" className="btn sm ghost">
-          manage players
-        </Link>
+        <div className="row tight">
+          <button className="sm primary" onClick={castTheBand} disabled={busy}>
+            {busy ? "…" : "Cast the whole band"}
+          </button>
+          <Link href="/band" className="btn sm ghost">
+            manage band
+          </Link>
+        </div>
       </div>
       <p className="muted">
         Who plays each part. Each player performs in their own learned style —
         nudge it with the dials, or turn up “explore” to let them try new things.
       </p>
+      {note && <p className="muted">{note}</p>}
       {err && <p className="danger">{err}</p>}
 
       <div className="stack">

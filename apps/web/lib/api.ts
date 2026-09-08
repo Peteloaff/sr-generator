@@ -98,6 +98,16 @@ export interface StyleModel {
   style_profile: Record<string, number | string> | null;
 }
 export interface Genre { id: string; label: string }
+export interface BandLineup {
+  band_id: string;
+  singers: { id: string; name: string; training_status: string; consent_generation: boolean }[];
+  players: Record<PlayerRole, {
+    id: string; name: string; training_status: string;
+    training_samples: number; consent_generation: boolean;
+  }[]>;
+  roles_filled: Record<PlayerRole, boolean>;
+  vocals_ready: boolean;
+}
 export interface InstrumentSlot {
   id: string; song_id: string; section_id: string | null; role: PlayerRole;
   player_id: string | null; muted: boolean; gain_db: number; explore: number;
@@ -200,7 +210,9 @@ export const api = {
 
   listBands: () => req<Band[]>("/bands"),
   createBand: (name: string) => req<Band>("/bands", { method: "POST", body: JSON.stringify({ name }) }),
-  bandStats: (id: string) => req<{ singers: number; projects: number }>(`/bands/${id}/stats`),
+  bandStats: (id: string) =>
+    req<{ singers: number; players: number; projects: number }>(`/bands/${id}/stats`),
+  bandLineup: (id: string) => req<BandLineup>(`/bands/${id}/lineup`),
 
   listSingers: () => req<Singer[]>("/singers"),
   createSinger: (name: string) => req<Singer>("/singers", { method: "POST", body: JSON.stringify({ name }) }),
@@ -240,6 +252,11 @@ export const api = {
   }),
   clearInstrument: (songId: string, slotId: string) =>
     req<void>(`/songs/${songId}/instruments/${slotId}`, { method: "DELETE" }),
+  castBand: (songId: string, overwrite = false) =>
+    req<{ players: Record<string, string>; vocals: unknown }>(
+      `/songs/${songId}/cast-band`,
+      { method: "POST", body: JSON.stringify({ overwrite }) },
+    ),
 
   listProjects: () => req<Project[]>("/projects"),
   createProject: (name: string) => req<Project>("/projects", { method: "POST", body: JSON.stringify({ name }) }),

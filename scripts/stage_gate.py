@@ -1272,11 +1272,53 @@ def stage17(client) -> list[Row]:
     return rows
 
 
+def stage18(client) -> list[Row]:
+    rows: list[Row] = []
+    try:
+        for name, role in (("Tony", "rhythm_guitar"), ("Geezer", "bass"), ("Bill", "drums")):
+            pid = client.post("/players", json={"name": name, "role": role}).json()["id"]
+            client.patch(f"/players/{pid}", json={"consent_generation": True})
+        sid = client.post("/singers", json={"name": "Ozzy"}).json()["id"]
+        client.patch(f"/singers/{sid}", json={"consent_generation": True})
+
+        band_id = client.get("/bands").json()[0]["id"]
+        lu = client.get(f"/bands/{band_id}/lineup").json()
+        rows.append(("Band lineup lists vocalists + players by instrument",
+                     [s["name"] for s in lu["singers"]] == ["Ozzy"]
+                     and lu["players"]["bass"][0]["name"] == "Geezer"
+                     and lu["roles_filled"]["keys"] is False,
+                     f"filled: {[r for r, v in lu['roles_filled'].items() if v]}"))
+
+        song = client.post("/songs", json={"title": "War Pigs", "seed": 3}).json()
+        gj = client.post(f"/songs/{song['id']}/generate", json={})
+        client.post(f"/jobs/{gj.json()['id']}/wait", params={"timeout": 120})
+
+        r = client.post(f"/songs/{song['id']}/cast-band", json={"overwrite": True}).json()
+        rows.append(("'Cast the band' fills every instrument the band can play",
+                     r["players"].get("bass") == "Geezer"
+                     and r["players"].get("drums") == "Bill", str(r["players"])))
+        rows.append(("'Cast the band' also arranges the singers",
+                     r["vocals"] is not None and r["vocals"].get("applied"), ""))
+
+        slots = client.get(f"/songs/{song['id']}/instruments").json()
+        rows.append(("Instrument slots are persisted from the band cast",
+                     sum(1 for s in slots if s["player_id"]) >= 3, f"{len(slots)} slots"))
+
+        # then the individual workflow still works - override one part
+        j = client.put(f"/songs/{song['id']}/instruments",
+                       json={"role": "bass", "player_id": None})
+        rows.append(("Individual casting still overrides the band default",
+                     j.status_code == 200 and j.json()["player_id"] is None, ""))
+    except Exception as exc:  # noqa: BLE001
+        rows.append(("Band lineup + one-click casting", False, repr(exc)))
+    return rows
+
+
 STAGES = {
     "0": stage0, "1": stage1, "2": stage2, "3": stage3, "4": stage4,
     "5": stage5, "6": stage6, "7": stage7, "8": stage8, "9": stage9,
     "10": stage10, "11": stage11, "12": stage12, "13": stage13, "14": stage14,
-    "15": stage15, "17": stage17,
+    "15": stage15, "17": stage17, "18": stage18,
 }
 
 
