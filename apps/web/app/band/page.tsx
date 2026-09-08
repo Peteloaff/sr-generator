@@ -13,6 +13,8 @@ import {
 } from "@/lib/api";
 import SingerCard from "@/components/SingerCard";
 import PlayerCard from "@/components/PlayerCard";
+import SignaturePlayers from "@/components/SignaturePlayers";
+import BandIdentity from "@/components/BandIdentity";
 
 export default function BandPage() {
   const [lineup, setLineup] = useState<BandLineup | null>(null);
@@ -62,9 +64,11 @@ export default function BandPage() {
       <p className="muted">
         Everyone in your band — singers and players. Train each one, then when you
         make a song you can cast the whole band in one click, or pick members
-        part by part.
+        part by part. New to this? <Link href="/help">See the walkthrough →</Link>
       </p>
       {err && <p className="danger">{err}</p>}
+
+      <BandIdentity onSwitch={refresh} />
 
       {lineup && (
         <div className="card" style={{ marginBottom: "1rem" }}>
@@ -139,7 +143,8 @@ export default function BandPage() {
       )}
 
       <h2 style={{ marginTop: "1.5rem" }}>Players</h2>
-      <div className="row">
+      <SignaturePlayers onChange={refresh} />
+      <div className="row" style={{ marginTop: "0.6rem" }}>
         <input
           placeholder="New player name"
           value={pName}

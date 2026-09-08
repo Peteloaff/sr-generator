@@ -98,6 +98,10 @@ export interface StyleModel {
   style_profile: Record<string, number | string> | null;
 }
 export interface Genre { id: string; label: string }
+export interface PlayerPreset {
+  id: string; role: PlayerRole; vibe: string; label: string;
+  profile: Record<string, number | string>;
+}
 export interface BandLineup {
   band_id: string;
   singers: { id: string; name: string; training_status: string; consent_generation: boolean }[];
@@ -210,6 +214,9 @@ export const api = {
 
   listBands: () => req<Band[]>("/bands"),
   createBand: (name: string) => req<Band>("/bands", { method: "POST", body: JSON.stringify({ name }) }),
+  updateBand: (id: string, patch: { name?: string; notes?: string }) =>
+    req<Band>(`/bands/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
+  deleteBand: (id: string) => req<void>(`/bands/${id}`, { method: "DELETE" }),
   bandStats: (id: string) =>
     req<{ singers: number; players: number; projects: number }>(`/bands/${id}/stats`),
   bandLineup: (id: string) => req<BandLineup>(`/bands/${id}/lineup`),
@@ -227,6 +234,18 @@ export const api = {
   updatePlayer: (id: string, patch: Partial<Player>) =>
     req<Player>(`/players/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
   deletePlayer: (id: string) => req<void>(`/players/${id}`, { method: "DELETE" }),
+  listPlayerPresets: (role?: PlayerRole) =>
+    req<PlayerPreset[]>(`/players/presets${role ? `?role=${role}` : ""}`),
+  createPlayerFromPreset: (preset: string, name: string) =>
+    req<Player>(`/players/from-preset`, {
+      method: "POST",
+      body: JSON.stringify({ preset, name }),
+    }),
+  applyPlayerPreset: (id: string, preset: string) =>
+    req<Player>(`/players/${id}/apply-preset`, {
+      method: "POST",
+      body: JSON.stringify({ preset }),
+    }),
   getStyleModel: (id: string) => req<StyleModel>(`/players/${id}/style-model`),
   listPlayerSamples: (id: string) => req<AudioAsset[]>(`/players/${id}/samples`),
   uploadPlayerSample: (id: string, file: File) =>

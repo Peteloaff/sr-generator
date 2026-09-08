@@ -1,5 +1,22 @@
 # Changelog
 
+## [Stage 19] Signature style presets + Help + band identity — 2026-09-08
+
+### Added
+- **`sr/common/player_presets.py`** — 45 built-in signature playing styles: every
+  instrument (lead / rhythm guitar, bass, drums, keys) × 9 vibes (acoustic,
+  clean, blues, indie, classic rock, hard rock, metal, **modern metal**, doom).
+  Style archetypes, not anyone's recordings.
+- **`GET /players/presets`**, **`POST /players/from-preset`** (drops in a
+  ready-to-use player, consent + trained status set), **`POST
+  /players/{id}/apply-preset`** (an existing player adopts a style).
+- Web: a **Signature players** picker on the Band page; a **Help** page
+  (`/help`, linked in the nav and from the Band page) with a 7-step walkthrough.
+- **`BandIdentity`** on the Band page — rename the current band, spin up a new
+  one, switch between them; makes it clear each band saves its own line-up.
+- Responsive polish (help layout, chips, band controls on phones).
+- `scripts/stage_gate.py 19`; `tests/test_player_presets.py` (185 tests).
+
 ## [Stage 18] Band lineup + one-click casting — 2026-09-08
 
 Assemble singers + players into a band and cast them onto a song in one click.

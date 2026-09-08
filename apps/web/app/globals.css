@@ -394,3 +394,27 @@ pre {
   .hero h1 { font-size: 2rem; }
   .stepnav button span.faint { font-size: 0.72rem; }
 }
+
+/* ---- help / walkthrough ------------------------------------- */
+.help { max-width: 60ch; }
+.help-steps { list-style: none; padding: 0; margin: 1.5rem 0; counter-reset: none; }
+.help-steps > li {
+  border-left: 2px solid var(--line);
+  padding: 0.2rem 0 0.2rem 1.1rem;
+  margin: 0 0 1.4rem;
+}
+.help-steps h3 { margin: 0 0 0.35rem; font-size: 1.05rem; }
+.help-steps p { margin: 0.35rem 0; color: var(--muted); }
+.help-steps ul { margin: 0.4rem 0; padding-left: 1.1rem; }
+.help-steps li { color: var(--muted); }
+.help b { color: var(--fg); font-weight: 600; }
+
+/* signature-style chips wrap and stay tappable */
+.chip { white-space: nowrap; }
+@media (max-width: 640px) {
+  .help { max-width: 100%; }
+  .chip { min-height: 34px; }
+  /* band identity + cast controls: let every control take a full row */
+  .card .row.tight > select,
+  .card .row.tight > input:not([type="checkbox"]):not([type="range"]) { flex: 1 1 140px; }
+}

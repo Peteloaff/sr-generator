@@ -5,11 +5,18 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from sr.api.deps import get_band
+from sr.common import player_presets
 from sr.db import get_db
 from sr.models.band import Band
 from sr.models.enums import PlayerRole
 from sr.models.player import Player
-from sr.schemas.player import PlayerCreate, PlayerRead, PlayerUpdate
+from sr.schemas.player import (
+    ApplyPresetRequest,
+    PlayerCreate,
+    PlayerFromPreset,
+    PlayerRead,
+    PlayerUpdate,
+)
 
 router = APIRouter(prefix="/players", tags=["players"])
 
@@ -18,6 +25,36 @@ def _player(db: Session, player_id: str) -> Player:
     player = db.get(Player, player_id)
     if player is None:
         raise HTTPException(404, "player not found")
+    return player
+
+
+@router.get("/presets")
+def list_style_presets(role: PlayerRole | None = Query(default=None)) -> list[dict]:
+    return player_presets.list_presets(role.value if role else None)
+
+
+@router.post("/from-preset", response_model=PlayerRead, status_code=201)
+def create_player_from_preset(
+    payload: PlayerFromPreset, band: Band = Depends(get_band), db: Session = Depends(get_db)
+) -> Player:
+    preset = player_presets.get_preset(payload.preset)
+    if preset is None:
+        raise HTTPException(404, f"unknown style preset {payload.preset!r}")
+    band_id = payload.band_id or band.id
+    if db.scalar(
+        select(Player).where(Player.band_id == band_id, Player.name == payload.name)
+    ):
+        raise HTTPException(409, f"player named {payload.name!r} already exists in this band")
+    player = Player(
+        band_id=band_id, name=payload.name, role=preset["role"],
+        style_profile_json=preset["profile"], style_model_provider="preset",
+        style_model_path_or_id=preset["id"], training_status="ready",
+        consent_training=True, consent_generation=True,
+        notes=f"Signature style: {preset['label']}",
+    )
+    db.add(player)
+    db.commit()
+    db.refresh(player)
     return player
 
 
@@ -70,6 +107,28 @@ def update_player(player_id: str, payload: PlayerUpdate, db: Session = Depends(g
         raise HTTPException(409, f"player named {updates['name']!r} already exists in this band")
     for field, value in updates.items():
         setattr(player, field, value.value if hasattr(value, "value") else value)
+    db.commit()
+    db.refresh(player)
+    return player
+
+
+@router.post("/{player_id}/apply-preset", response_model=PlayerRead)
+def apply_style_preset(
+    player_id: str, payload: ApplyPresetRequest, db: Session = Depends(get_db)
+) -> Player:
+    player = _player(db, player_id)
+    preset = player_presets.get_preset(payload.preset)
+    if preset is None:
+        raise HTTPException(404, f"unknown style preset {payload.preset!r}")
+    if preset["role"] != player.role:
+        raise HTTPException(
+            422, f"{preset['label']!r} is a {preset['role']} style, not {player.role}"
+        )
+    player.style_profile_json = preset["profile"]
+    player.style_model_provider = "preset"
+    player.style_model_path_or_id = preset["id"]
+    if player.training_status in ("none", "failed"):
+        player.training_status = "ready"
     db.commit()
     db.refresh(player)
     return player

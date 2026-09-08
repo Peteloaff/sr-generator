@@ -24,6 +24,16 @@ class PlayerCreate(PlayerBase):
     band_id: str | None = None  # defaults to the active band
 
 
+class PlayerFromPreset(BaseModel):
+    preset: str  # "<role>.<vibe>", e.g. "lead_guitar.metal"
+    name: str = Field(min_length=1, max_length=120)
+    band_id: str | None = None
+
+
+class ApplyPresetRequest(BaseModel):
+    preset: str
+
+
 class PlayerUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=120)
     role: PlayerRole | None = None

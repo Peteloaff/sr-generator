@@ -1314,11 +1314,58 @@ def stage18(client) -> list[Row]:
     return rows
 
 
+def stage19(client) -> list[Row]:
+    rows: list[Row] = []
+    try:
+        from sr.common import player_presets as pp
+
+        presets = client.get("/players/presets").json()
+        rows.append(("Signature styles cover every instrument, acoustic -> metal",
+                     len(presets) == 5 * len(pp.VIBES)
+                     and any(p["id"] == "drums.modern_metal" for p in presets)
+                     and any(p["id"] == "lead_guitar.acoustic" for p in presets),
+                     f"{len(presets)} presets"))
+
+        r = client.post("/players/from-preset",
+                        json={"preset": "drums.modern_metal", "name": "Modern Metal Drums"})
+        p = r.json()
+        rows.append(("A signature player drops in ready to use (no training)",
+                     r.status_code == 201 and p["training_status"] == "ready"
+                     and p["consent_generation"] is True
+                     and p["style_profile_json"]["busyness"] > 0.85, ""))
+
+        # it actually shapes a render
+        gp = client.post("/players/from-preset",
+                         json={"preset": "bass.doom", "name": "Doom Bass"}).json()["id"]
+        sid = client.post("/songs", json={"title": "Sig", "seed": 2}).json()["id"]
+        gj = client.post(f"/songs/{sid}/generate", json={}).json()
+        client.post(f"/jobs/{gj['id']}/wait", params={"timeout": 120})
+        secs = client.get(f"/songs/{sid}/sections").json()
+        client.put(f"/songs/{sid}/instruments", json={"role": "bass", "player_id": gp})
+        j = client.post(f"/songs/{sid}/sections/{secs[0]['id']}/generate-instrumental",
+                        json={}).json()
+        d = client.post(f"/jobs/{j['id']}/wait", params={"timeout": 120}).json()
+        cast_bass = (d.get("result_json") or {}).get("cast", {}).get("bass")
+        rows.append(("A signature player reaches the render",
+                     d["status"] == "succeeded" and cast_bass == "Doom Bass", ""))
+
+        pid = client.post("/players", json={"name": "Ed", "role": "lead_guitar"}).json()["id"]
+        ap = client.post(f"/players/{pid}/apply-preset", json={"preset": "lead_guitar.metal"})
+        rows.append(("An existing player can adopt a signature style",
+                     ap.status_code == 200 and ap.json()["style_profile_json"]["drive"] >= 0.9, ""))
+        rows.append(("A style can only be applied to its own instrument",
+                     client.post(f"/players/{pid}/apply-preset",
+                                 json={"preset": "drums.metal"}).status_code == 422, ""))
+    except Exception as exc:  # noqa: BLE001
+        rows.append(("Signature style presets", False, repr(exc)))
+    return rows
+
+
 STAGES = {
     "0": stage0, "1": stage1, "2": stage2, "3": stage3, "4": stage4,
     "5": stage5, "6": stage6, "7": stage7, "8": stage8, "9": stage9,
     "10": stage10, "11": stage11, "12": stage12, "13": stage13, "14": stage14,
-    "15": stage15, "17": stage17, "18": stage18,
+    "15": stage15, "17": stage17, "18": stage18, "19": stage19,
 }
 
 

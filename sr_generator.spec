@@ -45,7 +45,13 @@ a = Analysis(
     hiddenimports=hiddenimports,
     hookspath=[],
     runtime_hooks=[],
-    excludes=["tkinter", "matplotlib", "moto", "pytest", "IPython"],
+    # demucs / torch are installed on first use into ~/.sr-generator/pydeps,
+    # never bundled (they would add ~2 GB). Keep them out even if something
+    # imports them transitively.
+    excludes=[
+        "tkinter", "matplotlib", "moto", "pytest", "IPython",
+        "demucs", "torch", "torchaudio", "julius", "openunmix",
+    ],
     noarchive=False,
 )
 pyz = PYZ(a.pure)

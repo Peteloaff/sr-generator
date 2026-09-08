@@ -24,6 +24,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/references">Band DNA</Link>
             <Link href="/projects">Projects</Link>
             <Link href="/jobs">Jobs</Link>
+            <Link href="/help">Help</Link>
           </nav>
           <span className="spacer" />
           <BandSwitcher />
