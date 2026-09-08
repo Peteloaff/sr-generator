@@ -10,6 +10,7 @@ export default function ReferencesPage() {
   const [manifest, setManifest] = useState<{ status: number; body: unknown } | null>(null);
   const [adapters, setAdapters] = useState<BandAdapter[]>([]);
   const [folder, setFolder] = useState("");
+  const [drive, setDrive] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
@@ -95,6 +96,32 @@ export default function ReferencesPage() {
         <button disabled={!!busy} onClick={() => run("analyze", () => api.analyzeBand(bandId!))}>
           {busy === "analyze" ? "analysing…" : "Analyse all"}
         </button>
+      </div>
+
+      <div className="row" style={{ marginTop: "0.4rem" }}>
+        <input
+          placeholder="…or paste a Google Drive folder link"
+          value={drive}
+          onChange={(e) => setDrive(e.target.value)}
+          style={{ minWidth: 320 }}
+        />
+        <button
+          disabled={!!busy || !drive.trim()}
+          onClick={() =>
+            run("import", () =>
+              api.importDriveFolder(bandId!, {
+                drive_folder: drive.trim(),
+                recursive: true,
+                auto_approve: false,
+              }),
+            )
+          }
+        >
+          {busy === "import" ? "importing…" : "Import from Drive"}
+        </button>
+        <span className="faint" style={{ fontSize: "0.78rem" }}>
+          Share the folder as “anyone with the link”. Needs SR_GOOGLE_API_KEY set.
+        </span>
         <label>
           <input
             type="file"

@@ -16,6 +16,7 @@ from sr.models.band_reference import BandReference
 from sr.models.generation_job import GenerationJob
 from sr.schemas.job import JobRead
 from sr.schemas.reference import (
+    DriveImportRequest,
     FolderImportRequest,
     ManifestSnapshot,
     ReferenceDetail,
@@ -76,15 +77,12 @@ async def upload_reference(
     return ref
 
 
-@router.post("/bands/{band_id}/references/import-folder", response_model=JobRead, status_code=201)
-def import_folder_endpoint(
-    band_id: str, body: FolderImportRequest, db: Session = Depends(get_db)
-) -> GenerationJob:
+def _queue_import(db: Session, band_id: str, params: dict) -> GenerationJob:
     if db.get(Band, band_id) is None:
         raise HTTPException(404, "band not found")
     job = GenerationJob(
         job_type="import_folder", provider="catalogue-import", status="queued",
-        parameters_json={"band_id": band_id, **body.model_dump()},
+        parameters_json={"band_id": band_id, **params},
     )
     db.add(job)
     db.commit()
@@ -92,6 +90,20 @@ def import_folder_endpoint(
     get_queue().enqueue(job.id)
     db.refresh(job)
     return job
+
+
+@router.post("/bands/{band_id}/references/import-folder", response_model=JobRead, status_code=201)
+def import_folder_endpoint(
+    band_id: str, body: FolderImportRequest, db: Session = Depends(get_db)
+) -> GenerationJob:
+    return _queue_import(db, band_id, body.model_dump())
+
+
+@router.post("/bands/{band_id}/references/import-drive", response_model=JobRead, status_code=201)
+def import_drive_endpoint(
+    band_id: str, body: DriveImportRequest, db: Session = Depends(get_db)
+) -> GenerationJob:
+    return _queue_import(db, band_id, body.model_dump())
 
 
 @router.post("/bands/{band_id}/references/analyze", response_model=JobRead, status_code=201)

@@ -1225,11 +1225,58 @@ def stage15(client) -> list[Row]:
     return rows
 
 
+def stage17(client) -> list[Row]:
+    rows: list[Row] = []
+    from sr.services import drive
+
+    tree = {
+        "GATEROOT": [
+            {"id": "a", "name": "song one.wav", "mimeType": "audio/wav"},
+            {"id": "b", "name": "readme.txt", "mimeType": "text/plain"},
+            {"id": "d", "name": "live", "mimeType": "application/vnd.google-apps.folder"},
+        ],
+        "d": [{"id": "c", "name": "song two.mp3", "mimeType": "audio/mpeg"}],
+    }
+    orig_get, orig_dl = drive._get_json, drive.download
+    drive._get_json = lambda p, params: {"files": tree.get(params["q"].split("'")[1], [])}
+    drive.download = lambda fid: _wav_bytes(1.0)
+    try:
+        rows.append(("A Drive folder link parses to an id",
+                     drive.parse_folder_id(
+                         "https://drive.google.com/drive/folders/GATEROOT") == "GATEROOT", ""))
+
+        band = client.get("/bands").json()[0]["id"]
+        job = client.post(f"/bands/{band}/references/import-drive", json={
+            "drive_folder": "https://drive.google.com/drive/folders/GATEROOT"}).json()
+        done = client.post(f"/jobs/{job['id']}/wait", params={"timeout": 60}).json()
+        rows.append(("Reference songs import from a Drive folder (recursing subfolders)",
+                     done["status"] == "succeeded"
+                     and done["result_json"]["source"] == "drive"
+                     and done["result_json"]["scanned"] == 2,
+                     f"scanned {done['result_json'].get('scanned')}"))
+
+        pid = client.post("/players", json={"name": "Drive Dave", "role": "bass"}).json()["id"]
+        made = client.post(f"/players/{pid}/samples/import-drive", json={
+            "drive_folder": "https://drive.google.com/drive/folders/GATEROOT"})
+        rows.append(("Player training songs import from Drive",
+                     made.status_code == 201 and len(made.json()) == 2, ""))
+
+        bad = client.post(f"/players/{pid}/samples/import-drive",
+                          json={"drive_folder": "not a link"})
+        rows.append(("A bad folder link is a clear 400, not a crash",
+                     bad.status_code == 400, ""))
+    except Exception as exc:  # noqa: BLE001
+        rows.append(("Google Drive folder source", False, repr(exc)))
+    finally:
+        drive._get_json, drive.download = orig_get, orig_dl
+    return rows
+
+
 STAGES = {
     "0": stage0, "1": stage1, "2": stage2, "3": stage3, "4": stage4,
     "5": stage5, "6": stage6, "7": stage7, "8": stage8, "9": stage9,
     "10": stage10, "11": stage11, "12": stage12, "13": stage13, "14": stage14,
-    "15": stage15,
+    "15": stage15, "17": stage17,
 }
 
 

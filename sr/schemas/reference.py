@@ -52,6 +52,12 @@ class FolderImportRequest(BaseModel):
     auto_approve: bool = False
 
 
+class DriveImportRequest(BaseModel):
+    drive_folder: str  # a Drive folder URL or id, link-shared ("anyone with link")
+    recursive: bool = True
+    auto_approve: bool = False
+
+
 class ManifestSnapshot(BaseModel):
     dataset_version: str
     snapshot_version: int

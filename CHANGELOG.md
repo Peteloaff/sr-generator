@@ -1,5 +1,25 @@
 # Changelog
 
+## [Stage 17] Google Drive folder source — 2026-09-07
+
+Pull reference songs and player training material from a Google Drive folder,
+not just the local disk.
+
+### Added
+- **`sr/services/drive.py`** — no OAuth: share a Drive folder as "anyone with
+  the link", set `SR_GOOGLE_API_KEY`, and it lists + downloads the audio via the
+  public Drive v3 REST API (stdlib only). Recurses subfolders; filters to
+  supported audio types; clear error when the key or a valid folder link is
+  missing.
+- **`POST /bands/{id}/references/import-drive`** — same `import_folder` job,
+  Drive-backed (`source: "drive"`). `import_folder` refactored to a shared
+  ingest loop over local-path *or* Drive.
+- **`POST /players/{id}/samples/import-drive`** — pull a player's training songs
+  from a Drive folder.
+- Web: a "Google Drive folder link" input on the Band DNA page and on each
+  `PlayerCard`.
+- `scripts/stage_gate.py 17`; `tests/test_drive.py` (5 tests, 172 total).
+
 ## [Stage 16] Web UI for players, genre & casting — 2026-09-07
 
 Stages 12-15 are now usable from the app.

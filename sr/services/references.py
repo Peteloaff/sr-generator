@@ -53,32 +53,55 @@ def ingest_bytes(
     return ref
 
 
-def import_folder(
-    db: Session, job: GenerationJob, *, band_id: str, params: dict
-) -> dict:
-    band = db.get(Band, band_id)
-    if band is None:
-        raise LookupError(f"band {band_id} not found")
+def _collect_local(params: dict) -> tuple[str, list[tuple[str, str, str, bytes]]]:
     root = Path(params["path"]).expanduser()
     if not root.is_dir():
         raise ValueError(f"not a directory: {root}")
     recursive = bool(params.get("recursive", True))
-    auto_approve = bool(params.get("auto_approve", False))
-
     files = sorted(
         p for p in (root.rglob("*") if recursive else root.iterdir())
         if p.is_file() and p.suffix.lower() in AUDIO_SUFFIXES
     )
     if not files:
         raise ValueError(f"no audio files under {root}")
+    return str(root), [(p.stem, p.name, str(p), p.read_bytes()) for p in files]
+
+
+def _collect_drive(params: dict) -> tuple[str, list[tuple[str, str, str, bytes]]]:
+    from sr.services import drive
+
+    folder_id = drive.parse_folder_id(str(params.get("drive_folder", "")))
+    recursive = bool(params.get("recursive", True))
+    listing = drive.list_folder_audio(folder_id, recursive=recursive)
+    if not listing:
+        raise ValueError("no audio files in that Drive folder (is it link-shared?)")
+    items: list[tuple[str, str, str, bytes]] = []
+    for f in listing:
+        items.append(
+            (Path(f["name"]).stem, f["name"], f"drive:{f['path']}", drive.download(f["id"]))
+        )
+    return f"drive:{folder_id}", items
+
+
+def import_folder(
+    db: Session, job: GenerationJob, *, band_id: str, params: dict
+) -> dict:
+    band = db.get(Band, band_id)
+    if band is None:
+        raise LookupError(f"band {band_id} not found")
+    auto_approve = bool(params.get("auto_approve", False))
+
+    is_drive = bool(params.get("drive_folder"))
+    report_progress(db, job, 0.02, "listing Drive folder" if is_drive else "scanning folder")
+    root, items = _collect_drive(params) if is_drive else _collect_local(params)
 
     created, skipped, failed = [], 0, 0
-    for i, path in enumerate(files):
-        report_progress(db, job, 0.05 + 0.9 * i / len(files), f"{path.name}")
+    for i, (title, filename, source_ref, data) in enumerate(items):
+        report_progress(db, job, 0.05 + 0.9 * i / len(items), filename)
         try:
             ref = ingest_bytes(
-                db, band, title=path.stem, filename=path.name, data=path.read_bytes(),
-                source_kind="folder", source_file=str(path),
+                db, band, title=title, filename=filename, data=data,
+                source_kind="drive" if is_drive else "folder", source_file=source_ref,
             )
         except Exception:  # noqa: BLE001 - one bad file shouldn't abort the import
             failed += 1
@@ -94,9 +117,9 @@ def import_folder(
 
     db.flush()
     return {
-        "band_id": band_id, "root": str(root), "scanned": len(files),
-        "created": len(created), "skipped_duplicates": skipped, "failed": failed,
-        "reference_ids": created,
+        "band_id": band_id, "root": root, "source": "drive" if is_drive else "folder",
+        "scanned": len(items), "created": len(created),
+        "skipped_duplicates": skipped, "failed": failed, "reference_ids": created,
     }
 
 

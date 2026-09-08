@@ -49,6 +49,10 @@ class Settings(BaseSettings):
     mastering_provider: str = "mock"
     transcription_provider: str = "mock"
 
+    # Google Drive folder source (Stage 17). An API key for a link-shared folder;
+    # no OAuth. Enable the Drive API on the key's project.
+    google_api_key: str = ""
+
     log_level: str = "INFO"
     default_seed: int = 1337
     api_cors_origins: str = "http://localhost:3000"

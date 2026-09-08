@@ -324,6 +324,19 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+  importDriveFolder: (
+    bandId: string,
+    body: { drive_folder: string; recursive: boolean; auto_approve: boolean },
+  ) =>
+    req<Job>(`/bands/${bandId}/references/import-drive`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  importPlayerSamplesFromDrive: (playerId: string, drive_folder: string) =>
+    req<AudioAsset[]>(`/players/${playerId}/samples/import-drive`, {
+      method: "POST",
+      body: JSON.stringify({ drive_folder }),
+    }),
   analyzeBand: (bandId: string) =>
     req<Job>(`/bands/${bandId}/references/analyze`, { method: "POST" }),
   updateReference: (id: string, patch: Partial<BandReference>) =>

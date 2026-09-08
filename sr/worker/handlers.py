@@ -69,8 +69,9 @@ def _analyze_reference(job: GenerationJob, db: Session) -> base.ProviderResult:
 def _import_folder(job: GenerationJob, db: Session) -> base.ProviderResult:
     from sr.services.references import import_folder
 
-    if not job.parameters_json or not job.parameters_json.get("band_id"):
-        raise ValueError("import_folder job requires band_id + path")
+    p = job.parameters_json or {}
+    if not p.get("band_id") or not (p.get("path") or p.get("drive_folder")):
+        raise ValueError("import_folder job requires band_id + path or drive_folder")
     summary = import_folder(
         db, job, band_id=job.parameters_json["band_id"], params=job.parameters_json
     )

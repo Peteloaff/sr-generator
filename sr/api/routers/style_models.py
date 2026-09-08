@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -77,6 +78,54 @@ async def upload_sample(
     db.commit()
     db.refresh(asset)
     return asset
+
+
+class DriveSamplesRequest(BaseModel):
+    drive_folder: str
+    recursive: bool = True
+
+
+@router.post(
+    "/{player_id}/samples/import-drive",
+    response_model=list[AudioAssetRead],
+    status_code=201,
+)
+def import_samples_from_drive(
+    player_id: str, body: DriveSamplesRequest, db: Session = Depends(get_db)
+) -> list[AudioAsset]:
+    from sr.services import drive
+
+    player = _player(db, player_id)
+    try:
+        folder_id = drive.parse_folder_id(body.drive_folder)
+        listing = drive.list_folder_audio(folder_id, recursive=body.recursive)
+    except drive.DriveError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    if not listing:
+        raise HTTPException(422, "no audio files in that Drive folder (is it link-shared?)")
+
+    count = len(list_samples(player_id, db))
+    made: list[AudioAsset] = []
+    for f in listing:
+        try:
+            data = drive.download(f["id"])
+            base = f"models/players/{player.band_id}/{player_id}/sample_{count:03d}"
+            ing = audio.ingest_upload(get_storage(), base, f["name"], data)
+        except (drive.DriveError, ValueError):
+            continue
+        asset = AudioAsset(
+            player_id=player_id, asset_type="player_sample", file_path=ing.original_key,
+            label=f"{player.name} — {f['name']} (Drive)",
+            sample_rate=ing.info.sample_rate, channels=ing.info.channels,
+            duration=ing.info.duration,
+        )
+        db.add(asset)
+        made.append(asset)
+        count += 1
+    db.commit()
+    for a in made:
+        db.refresh(a)
+    return made
 
 
 @router.delete("/{player_id}/samples/{asset_id}", status_code=204)

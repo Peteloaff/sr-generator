@@ -38,6 +38,7 @@ export default function PlayerCard({
   const [samples, setSamples] = useState<AudioAsset[]>([]);
   const [busy, setBusy] = useState(false);
   const [tuning, setTuning] = useState(false);
+  const [drive, setDrive] = useState("");
   const [err, setErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -149,6 +150,33 @@ export default function PlayerCard({
           title={samples.length === 0 ? "upload a song this player performed on first" : ""}
         >
           {busy ? "…" : ready ? "Relearn style" : "Learn style"}
+        </button>
+      </div>
+
+      <div className="row tight">
+        <input
+          placeholder="…or a Google Drive folder link"
+          value={drive}
+          onChange={(e) => setDrive(e.target.value)}
+          style={{ flex: 1, minWidth: 160, fontSize: "0.82rem" }}
+        />
+        <button
+          className="sm ghost"
+          disabled={busy || !drive.trim()}
+          onClick={() =>
+            wrap(async () => {
+              if (!player.consent_training) {
+                await api.updatePlayer(player.id, {
+                  consent_training: true,
+                  consent_generation: true,
+                });
+              }
+              await api.importPlayerSamplesFromDrive(player.id, drive.trim());
+              setDrive("");
+            })
+          }
+        >
+          pull from Drive
         </button>
       </div>
 
