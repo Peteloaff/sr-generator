@@ -1,6 +1,6 @@
 [project]
 name = "sr-generator"
-version = "0.13.0"
+version = "0.13.1"
 description = "SR Generator - private AI band music workstation (Stages 0-12: full song generation, surgical regen, arranger, morph R&D, instrumentalist players)"
 requires-python = ">=3.12"
 dependencies = [

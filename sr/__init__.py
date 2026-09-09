@@ -12,4 +12,4 @@ drums / keys) whose style is learned from real recordings. Every model is a
 swappable provider. See ROADMAP.md.
 """
 
-__version__ = "0.13.0"
+__version__ = "0.13.1"
