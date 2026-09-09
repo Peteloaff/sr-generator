@@ -515,8 +515,14 @@ export const api = {
     req<Job>(`/singers/${singerId}/voice-model/train`, { method: "POST" }),
   listVoiceSamples: (singerId: string) =>
     req<AudioAsset[]>(`/singers/${singerId}/samples`),
-  uploadVoiceSample: (singerId: string, file: File) =>
-    upload<AudioAsset>(`/singers/${singerId}/samples`, file),
+  uploadVoiceSample: (singerId: string, file: File, fullSong = false) =>
+    upload<AudioAsset>(
+      `/singers/${singerId}/samples`,
+      file,
+      fullSong ? { full_song: "true" } : {},
+    ),
+  createSingerFromSong: (name: string, file: File) =>
+    upload<Job>(`/singers/from-song`, file, { name }),
   deleteVoiceSample: (singerId: string, assetId: string) =>
     req<void>(`/singers/${singerId}/samples/${assetId}`, { method: "DELETE" }),
   uploadGuide: (songId: string, sectionId: string, file: File) =>

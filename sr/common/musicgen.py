@@ -76,10 +76,13 @@ def _snare(n: int, seed: int, sr: int = SR) -> np.ndarray:
 
 
 def _hat(n: int, seed: int, sr: int = SR) -> np.ndarray:
+    if n <= 0:
+        return np.zeros(0, dtype=np.float32)
     rng = np.random.default_rng(seed & ((1 << 63) - 1))
     t = np.arange(n) / sr
     x = rng.standard_normal(n).astype(np.float32)
-    x = x - np.convolve(x, np.ones(12) / 12, mode="same")  # crude highpass
+    if n >= 12:  # np.convolve 'same' would otherwise grow x to len 12
+        x = x - np.convolve(x, np.ones(12) / 12, mode="same")  # crude highpass
     return (x * np.exp(-t * 45)).astype(np.float32)
 
 
@@ -186,6 +189,7 @@ def generate(
                 if hs >= n:
                     break
                 ht = _hat(min(n - hs, int(0.08 * sr)), derive_seed(seed, "hh", bar, b, h))
+                ht = ht[: max(0, n - hs)]
                 drums[hs : hs + len(ht)] += ht * (0.18 + 0.12 * drum_busy)
 
             # bass: root, walk to fifth on beat 4. sustain lengthens the note;

@@ -88,7 +88,9 @@ class AssetType(StrEnum):
     UPLOAD = "upload"
     REFERENCE = "reference"
     GUIDE_VOCAL = "guide_vocal"  # one melody/phrase per section, converted per singer
-    SINGER_SAMPLE = "singer_sample"  # training-input audio for a singer's voice model
+    SINGER_SAMPLE = "singer_sample"  # isolated vocal, training-input for a voice model
+    SINGER_SONG = "singer_song"  # a full song to separate the vocal from before training
+    SINGER_STEM = "singer_stem"  # a singer's vocal, separated out of a full song
     PLAYER_SAMPLE = "player_sample"  # training-input audio for a player's style model
     PLAYER_STEM = "player_stem"  # a player's instrument, separated out of a sample
     CONVERTED_VOCAL = "converted_vocal"  # a voice-converted guide (cached base per singer)

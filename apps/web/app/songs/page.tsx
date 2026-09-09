@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api, type Song } from "@/lib/api";
+import { playSong } from "@/lib/player";
 
 export default function SongsPage() {
   const [songs, setSongs] = useState<Song[]>([]);
@@ -55,7 +56,16 @@ export default function SongsPage() {
         <tbody>
           {songs.map((s) => (
             <tr key={s.id}>
-              <td>
+              <td style={{ whiteSpace: "nowrap" }}>
+                <button
+                  className="np-btn"
+                  title={s.status === "ready" ? "play" : "not generated yet"}
+                  disabled={s.status !== "ready"}
+                  onClick={() => playSong(s, songs)}
+                  style={{ marginRight: "0.5rem" }}
+                >
+                  ▶
+                </button>
                 <Link href={`/song?id=${s.id}`}>{s.title}</Link>
               </td>
               <td>
@@ -65,7 +75,14 @@ export default function SongsPage() {
               <td>{s.bpm ?? "—"}</td>
               <td>{s.key ?? "—"}</td>
               <td>
-                <button className="danger" onClick={() => api.deleteSong(s.id).then(refresh)}>
+                <button
+                  className="danger sm"
+                  onClick={() => {
+                    if (confirm(`Delete "${s.title}"? This can't be undone.`)) {
+                      api.deleteSong(s.id).then(refresh).catch((e) => setErr(String(e)));
+                    }
+                  }}
+                >
                   delete
                 </button>
               </td>

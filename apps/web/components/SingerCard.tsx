@@ -62,12 +62,12 @@ export default function SingerCard({
     }
   };
 
-  const addSample = (file: File) =>
+  const addSample = (file: File, fullSong = false) =>
     wrap(async () => {
       if (!singer.consent_training) {
         await api.updateSinger(singer.id, { consent_training: true, consent_generation: true });
       }
-      await api.uploadVoiceSample(singer.id, file);
+      await api.uploadVoiceSample(singer.id, file, fullSong);
     });
 
   const train = () => wrap(async () => void (await api.waitJob((await api.trainVoiceModel(singer.id)).id)));
@@ -121,12 +121,21 @@ export default function SingerCard({
           hint="10–30s of clear singing works best. Record a few takes, then train."
         />
         <label className="btn sm ghost" style={{ cursor: "pointer" }}>
-          upload file
+          upload vocal clip
           <input
             type="file"
             accept="audio/*,.wav,.mp3,.flac,.m4a,.ogg,.webm"
             style={{ display: "none" }}
-            onChange={(e) => e.target.files?.[0] && addSample(e.target.files[0])}
+            onChange={(e) => e.target.files?.[0] && addSample(e.target.files[0], false)}
+          />
+        </label>
+        <label className="btn sm ghost" style={{ cursor: "pointer" }} title="separates the vocal for you">
+          upload a song
+          <input
+            type="file"
+            accept="audio/*,.wav,.mp3,.flac,.m4a,.ogg"
+            style={{ display: "none" }}
+            onChange={(e) => e.target.files?.[0] && addSample(e.target.files[0], true)}
           />
         </label>
         <button
@@ -143,7 +152,8 @@ export default function SingerCard({
         <div className="row tight" style={{ gap: "0.4rem" }}>
           {samples.map((a, i) => (
             <span key={a.id} className="pill">
-              take {i + 1} · {a.duration ? `${a.duration.toFixed(1)}s` : "?"}
+              {a.asset_type === "singer_song" ? "song" : "take"} {i + 1} ·{" "}
+              {a.duration ? `${a.duration.toFixed(1)}s` : "?"}
               <button
                 className="danger sm"
                 style={{ padding: "0 0.3rem", border: "none" }}

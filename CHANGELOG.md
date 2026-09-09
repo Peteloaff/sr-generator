@@ -1,5 +1,30 @@
 # Changelog
 
+## Music player, vocalists from a song, Jobs page removed — 2026-09-09
+
+### Added
+- **Now-playing bar** (`components/NowPlaying.tsx` + `lib/player.ts`) — a fixed
+  player at the bottom. Hit ▶ on any finished song (Home or Songs page) and it
+  loads there and keeps playing as you move around the app. Prev/next when a
+  queue is set; the current song is remembered across a full reload
+  (localStorage).
+- **Train a vocalist from a full song.** `singer_song` sample type: on train,
+  the vocal is separated (same multistem provider as players) and used.
+  `SingerCard` gains an "upload a song" button; **`POST /singers/from-song`**
+  (multipart file + name) creates the singer and trains it in one shot; the Band
+  page has an "…or from a song" form. `tests/test_singer_from_song.py`
+  (188 tests).
+
+### Fixed
+- **`musicgen._hat` returned a length-12 buffer when asked for < 12 samples**
+  (`np.convolve` `same` mode grows the array), which crashed full-song
+  generation when a hi-hat landed 1–11 samples from a section boundary — more
+  likely since the Stage 14 swing offset. Guarded + the call site clips.
+
+### Removed
+- The **Jobs** page and its nav link (job status is surfaced inline where it
+  matters; the `/jobs` API stays for polling).
+
 ## Per-singer volume & pan in the Vocal Director — 2026-09-08
 
 Each singer in a vocal role now has a **vol** (−18…+6 dB) and **pan** (L↔R)

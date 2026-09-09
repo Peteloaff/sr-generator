@@ -23,6 +23,8 @@ export default function BandPage() {
   const [sName, setSName] = useState("");
   const [pName, setPName] = useState("");
   const [pRole, setPRole] = useState<PlayerRole>("lead_guitar");
+  const [fromSongName, setFromSongName] = useState("");
+  const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -56,6 +58,24 @@ export default function BandPage() {
     await api.createPlayer(pName.trim(), pRole);
     setPName("");
     refresh();
+  };
+  const singerFromSong = async (file: File) => {
+    if (!fromSongName.trim()) {
+      setErr("give the new vocalist a name first");
+      return;
+    }
+    setBusy(true);
+    setErr(null);
+    try {
+      const job = await api.createSingerFromSong(fromSongName.trim(), file);
+      await api.waitJob(job.id);
+      setFromSongName("");
+      refresh();
+    } catch (e) {
+      setErr(String(e));
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -111,17 +131,39 @@ export default function BandPage() {
       <h2>Vocalists</h2>
       <div className="row">
         <input
-          placeholder="New singer name"
+          placeholder="New vocalist name"
           value={sName}
           onChange={(e) => setSName(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && addSinger()}
         />
         <button onClick={addSinger}>Add vocalist</button>
         {!singers.some((s) => s.name === "Me") && (
-          <button className="primary" onClick={() => { setSName("Me"); }}>
+          <button className="primary" onClick={() => setSName("Me")}>
             🎤 name it “Me”
           </button>
         )}
+      </div>
+      <div className="row tight" style={{ marginTop: "0.3rem" }}>
+        <span className="faint">…or from a song:</span>
+        <input
+          placeholder="Vocalist name"
+          value={fromSongName}
+          onChange={(e) => setFromSongName(e.target.value)}
+          style={{ maxWidth: 180 }}
+        />
+        <label className="btn sm ghost" style={{ cursor: "pointer" }}>
+          {busy ? "separating…" : "upload a song"}
+          <input
+            type="file"
+            accept="audio/*,.wav,.mp3,.flac,.m4a,.ogg"
+            style={{ display: "none" }}
+            disabled={busy}
+            onChange={(e) => e.target.files?.[0] && singerFromSong(e.target.files[0])}
+          />
+        </label>
+        <span className="faint" style={{ fontSize: "0.78rem" }}>
+          strips the vocal and trains a new singer
+        </span>
       </div>
       {singers.length === 0 ? (
         <div className="empty">No vocalists yet.</div>

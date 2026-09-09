@@ -171,22 +171,58 @@ def _train_singer(job: GenerationJob, db: Session) -> base.ProviderResult:
     require_training(singer)  # ConsentError -> job fails safely
 
     storage = get_storage()
-    samples = db.scalars(
-        select(AudioAsset).where(
-            AudioAsset.singer_id == singer.id, AudioAsset.asset_type == "singer_sample"
+    samples = list(
+        db.scalars(
+            select(AudioAsset)
+            .where(
+                AudioAsset.singer_id == singer.id,
+                AudioAsset.asset_type.in_(["singer_sample", "singer_song"]),
+            )
+            .order_by(AudioAsset.created_at, AudioAsset.id)
         )
     )
+    # drop vocal stems from a previous run
+    for old in db.scalars(
+        select(AudioAsset).where(
+            AudioAsset.singer_id == singer.id, AudioAsset.asset_type == "singer_stem"
+        )
+    ):
+        db.delete(old)
+    db.flush()
+
+    singer.training_status = "training"
+    db.flush()
+
     paths: list[Path] = []
-    for a in samples:
+    separated = 0
+    for i, a in enumerate(samples):
         canonical_key = f"{Path(a.file_path).parent}/canonical.wav"
-        if storage.exists(canonical_key):
-            paths.append(storage.ensure_local(canonical_key))
+        if not storage.exists(canonical_key):
+            continue
+        local = storage.ensure_local(canonical_key)
+        if a.asset_type == "singer_song":
+            sep = get_provider("multistem").separate(source_path=local, params={})
+            vocal = sep.stems.get("stem_vocal")
+            if vocal is None:
+                raise ValueError(f"{sep.provider!r} returned no vocal stem")
+            key = f"models/singers/{singer.band_id}/{singer.id}/vocal_{i:03d}.wav"
+            storage.save_wav(key, vocal, sep.sample_rate)
+            db.add(AudioAsset(
+                singer_id=singer.id, parent_asset_id=a.id, generation_job_id=job.id,
+                asset_type="singer_stem", file_path=key,
+                label=f"{singer.name} - separated vocal ({i + 1})",
+                sample_rate=sep.sample_rate, channels=2,
+                duration=round(vocal.shape[0] / sep.sample_rate, 3),
+            ))
+            db.flush()
+            paths.append(storage.ensure_local(key))
+            separated += 1
+        else:
+            paths.append(local)
     if not paths:
         raise ValueError("no training samples uploaded for this singer")
 
     provider = get_provider("voice")
-    singer.training_status = "training"
-    db.flush()
     profile = provider.analyze(paths, singer_ref=singer.name)
 
     singer.voice_profile_json = profile
@@ -199,8 +235,15 @@ def _train_singer(job: GenerationJob, db: Session) -> base.ProviderResult:
         provider=provider.name,
         provider_version=getattr(provider, "version", "0"),
         outputs=[],
-        metadata={"singer_id": singer.id, "profile": profile, "samples": len(paths)},
-        logs=[f"trained {singer.name!r} voice model from {len(paths)} sample(s): {profile}"],
+        metadata={
+            "singer_id": singer.id, "profile": profile,
+            "samples": len(paths), "separated_from_songs": separated,
+        },
+        logs=[
+            f"trained {singer.name!r} from {len(paths)} sample(s)"
+            + (f" ({separated} separated from full songs)" if separated else "")
+            + f": {profile}"
+        ],
     )
 
 

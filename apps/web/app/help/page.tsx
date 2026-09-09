@@ -25,11 +25,22 @@ export default function HelpPage() {
 
         <li>
           <h3>2 · Add vocalists</h3>
+          <p>Under <b>Vocalists</b>, three ways to add a voice:</p>
+          <ul>
+            <li>
+              <b>Record</b> straight from your mic, or <b>upload vocal clips</b>{" "}
+              (10–30s of clear isolated singing).
+            </li>
+            <li>
+              <b>Upload a song</b> they sang on — the vocal is separated out for
+              you before training. Or use <b>…or from a song</b> to create the
+              singer and train in one step.
+            </li>
+            <li>Set the pitch / brightness / rasp sliders by hand.</li>
+          </ul>
           <p>
-            Under <b>Vocalists</b>, add a singer and either <b>record</b> straight
-            from your mic or <b>upload</b> a few clips (10–30s of clear singing).
-            Hit <b>Train voice</b>. Tick <b>generation OK</b> so they can be used.
-            You can also tune pitch / brightness / rasp by hand.
+            Hit <b>Train voice</b>, then tick <b>generation OK</b> so they can be
+            used.
           </p>
         </li>
 
@@ -46,9 +57,10 @@ export default function HelpPage() {
             </li>
             <li>
               <b>Learn from songs</b> — upload tracks a player performed on (or a
-              Google Drive folder link). Their instrument is separated out and
-              their style is learned: drive, tone, timing feel, how busy, how
-              dynamic. First training installs the separation engine (one time).
+              Google Drive folder link), or record a part live. Their instrument
+              is separated out and their style is learned: drive, tone, timing
+              feel, how busy, how dynamic. First training installs the separation
+              engine (one time).
             </li>
             <li>
               <b>By hand</b> — add a player and set the style sliders yourself.
@@ -126,13 +138,18 @@ export default function HelpPage() {
         </li>
 
         <li>
-          <h3>8 · Generate & edit</h3>
+          <h3>8 · Generate, play & edit</h3>
           <p>
             Hit <b>Generate song</b>. On the <b>Studio</b> step you get the full
             mix, a master, and every instrument and vocal as its own stem. Open a
             section to regenerate just that part, swap a player or singer for one
             section, lock a section you like, or roll back — the rest of the song
             stays exactly as it was.
+          </p>
+          <p>
+            Hit <b>▶</b> next to any finished song (Home or the Songs page) to
+            load it in the player bar at the bottom — it keeps playing as you move
+            around the app. Delete a song from the <b>Songs</b> page.
           </p>
         </li>
       </ol>

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import BandSwitcher from "@/components/BandSwitcher";
+import NowPlaying from "@/components/NowPlaying";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -23,13 +24,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/band">Band</Link>
             <Link href="/references">Band DNA</Link>
             <Link href="/projects">Projects</Link>
-            <Link href="/jobs">Jobs</Link>
             <Link href="/help">Help</Link>
           </nav>
           <span className="spacer" />
           <BandSwitcher />
         </header>
         <main>{children}</main>
+        <NowPlaying />
       </body>
     </html>
   );

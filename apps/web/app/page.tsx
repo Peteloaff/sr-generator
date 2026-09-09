@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api, type Singer, type Song } from "@/lib/api";
+import { playSong } from "@/lib/player";
 
 const STYLE_CHIPS = [
   "driving", "anthemic", "melodic", "heavy", "electronic",
@@ -117,17 +118,30 @@ export default function Home() {
             .slice()
             .reverse()
             .map((s) => (
-              <Link key={s.id} href={`/song?id=${s.id}`} className="card card-link">
+              <div key={s.id} className="card card-link">
                 <div className="row space tight">
-                  <strong>{s.title}</strong>
+                  <Link href={`/song?id=${s.id}`} style={{ fontWeight: 700 }}>
+                    {s.title}
+                  </Link>
                   <span className={`pill ${s.status === "ready" ? "ok" : ""}`}>{s.status}</span>
                 </div>
-                <p className="faint" style={{ fontSize: "0.85rem", margin: "0.3rem 0 0" }}>
-                  {s.duration ? `${s.duration.toFixed(0)}s` : "not generated"}
-                  {s.key ? ` · ${s.key}` : ""}
-                  {s.bpm ? ` · ${Math.round(s.bpm)} bpm` : ""}
-                </p>
-              </Link>
+                <div className="row tight" style={{ margin: "0.3rem 0 0" }}>
+                  {s.status === "ready" && (
+                    <button
+                      className="np-btn"
+                      title="play"
+                      onClick={() => playSong(s, songs.slice().reverse())}
+                    >
+                      ▶ play
+                    </button>
+                  )}
+                  <span className="faint" style={{ fontSize: "0.85rem" }}>
+                    {s.duration ? `${s.duration.toFixed(0)}s` : "not generated"}
+                    {s.key ? ` · ${s.key}` : ""}
+                    {s.bpm ? ` · ${Math.round(s.bpm)} bpm` : ""}
+                  </span>
+                </div>
+              </div>
             ))}
         </div>
       )}
