@@ -1321,7 +1321,7 @@ def stage19(client) -> list[Row]:
 
         presets = client.get("/players/presets").json()
         rows.append(("Signature styles cover every instrument, acoustic -> metal",
-                     len(presets) == 5 * len(pp.VIBES)
+                     len(presets) == 5 * len(pp.VIBES) + len(pp.SIGNATURES)
                      and any(p["id"] == "drums.modern_metal" for p in presets)
                      and any(p["id"] == "lead_guitar.acoustic" for p in presets),
                      f"{len(presets)} presets"))

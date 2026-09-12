@@ -8,11 +8,30 @@ from sr.common.playerstyle import StyleProfile
 
 def test_grid_covers_every_role_and_vibe():
     presets = pp.list_presets()
-    assert len(presets) == 5 * len(pp.VIBES)  # no vocals
+    assert len(presets) == 5 * len(pp.VIBES) + len(pp.SIGNATURES)  # no vocals
     ids = {p["id"] for p in presets}
     assert "lead_guitar.acoustic" in ids
     assert "drums.modern_metal" in ids
     assert "bass.doom" in ids
+
+
+def test_signature_presets():
+    presets = {p["id"]: p for p in pp.list_presets()}
+    assert presets["rhythm_guitar.timmy"]["role"] == "rhythm_guitar"
+    assert presets["lead_guitar.ted"]["role"] == "lead_guitar"
+    assert presets["drums.bonzo"]["role"] == "drums"
+    assert presets["bass.will"]["role"] == "bass"
+    assert presets["lead_guitar.street"]["role"] == "lead_guitar"
+    assert presets["rhythm_guitar.book"]["role"] == "rhythm_guitar"
+    assert presets["drums.bruce"]["role"] == "drums"
+    assert presets["drums.numbers"]["role"] == "drums"
+    assert presets["drums.kansas"]["role"] == "drums"
+    assert presets["bass.bug"]["role"] == "bass"
+    assert presets["bass.swim"]["role"] == "bass"
+    for codename, role in pp.SIGNATURES.items():
+        sp = StyleProfile.from_dict(pp.get_preset(f"{role}.{codename}")["profile"])
+        assert 0.0 <= sp.drive <= 1.0
+        assert -1.0 <= sp.brightness <= 1.0
 
 
 def test_profiles_are_valid_and_directional():
@@ -36,7 +55,7 @@ def test_unknown_preset_is_none():
 
 def test_api_lists_and_filters_presets(client):
     allp = client.get("/players/presets").json()
-    assert len(allp) == 5 * len(pp.VIBES)
+    assert len(allp) == 5 * len(pp.VIBES) + len(pp.SIGNATURES)
     drums = client.get("/players/presets", params={"role": "drums"}).json()
     assert {d["role"] for d in drums} == {"drums"}
     assert any(d["vibe"] == "modern_metal" for d in drums)

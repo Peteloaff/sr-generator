@@ -1,5 +1,17 @@
 # Changelog
 
+## Eleven named signature presets — 2026-09-12
+
+### Added
+- **Timmy** (rhythm guitar), **Ted** (lead guitar), **Bonzo** (drums),
+  **Will** (bass), **Street** (lead guitar), **Book** (rhythm guitar),
+  **Bruce**, **Numbers**, **Kansas** (drums), and **Bug**, **Swim** (bass) —
+  eleven one-off signature style archetypes alongside the acoustic-through-
+  doom grid, each tuned from widely-known public descriptions of a legendary
+  player's technique, not a recording or likeness. Same mechanism as the
+  rest of `player_presets.py` — a `StyleProfile` — appear automatically in
+  the Signature players picker and via `GET /players/presets`. 189 tests.
+
 ## Music player, vocalists from a song, Jobs page removed — 2026-09-09
 
 ### Added
