@@ -73,6 +73,13 @@ class Storage(abc.ABC):
     @abc.abstractmethod
     def url_for(self, key: str) -> str: ...
 
+    def redirect_url(self, key: str, *, filename: str, inline: bool) -> str | None:
+        """A URL clients can be redirected to instead of us streaming the file,
+        or None to serve it locally. Cloud Run's frontend proxy fails on large
+        fixed-length responses (~32MB+), so a large file should never be
+        streamed through the API process when it's already in object storage."""
+        return None
+
     # --- convenience (identical for every backend) --------------------
     def write_text(self, key: str, text: str) -> str:
         return self.write_bytes(key, text.encode("utf-8"))
@@ -241,6 +248,19 @@ class S3Storage(Storage):
         return self._client.generate_presigned_url(
             "get_object",
             Params={"Bucket": self.bucket, "Key": key.lstrip("/")},
+            ExpiresIn=3600,
+        )
+
+    def redirect_url(self, key: str, *, filename: str, inline: bool) -> str | None:
+        disposition = ("inline" if inline else "attachment") + f'; filename="{filename}"'
+        return self._client.generate_presigned_url(
+            "get_object",
+            Params={
+                "Bucket": self.bucket,
+                "Key": key.lstrip("/"),
+                "ResponseContentDisposition": disposition,
+                "ResponseContentType": _content_type(key),
+            },
             ExpiresIn=3600,
         )
 

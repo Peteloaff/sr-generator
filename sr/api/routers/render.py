@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
@@ -24,6 +24,11 @@ from sr.services.consent import blocked_for_generation
 from sr.worker.queue import get_queue
 
 router = APIRouter(prefix="/songs", tags=["render"])
+
+# Cloud Run's frontend proxy fails on large fixed-length responses (~32MB+),
+# so anything near that size must be redirected to object storage directly
+# instead of streamed through the API process.
+_REDIRECT_THRESHOLD_BYTES = 20_000_000
 
 
 def _section(db: Session, song_id: str, section_id: str) -> SongSection:
@@ -279,7 +284,7 @@ def list_render_takes(song_id: str, job_id: str, db: Session = Depends(get_db)) 
 @router.get("/{song_id}/assets/{asset_id}/download")
 def download_asset(
     song_id: str, asset_id: str, inline: bool = Query(default=False), db: Session = Depends(get_db)
-) -> FileResponse:
+) -> Response:
     _song(db, song_id)
     asset = db.get(AudioAsset, asset_id)
     if asset is None or asset.song_id != song_id:
@@ -287,9 +292,14 @@ def download_asset(
     storage = get_storage()
     if not storage.exists(asset.file_path):
         raise HTTPException(410, "asset file is gone")
+    name = f"{(asset.label or asset.asset_type).replace(' ', '_')}{Path(asset.file_path).suffix}"
+    approx_bytes = (asset.duration or 0) * (asset.sample_rate or 44100) * (asset.channels or 2) * 2
+    if approx_bytes > _REDIRECT_THRESHOLD_BYTES:
+        redirect = storage.redirect_url(asset.file_path, filename=name, inline=inline)
+        if redirect:
+            return RedirectResponse(redirect, status_code=302)
     path = storage.ensure_local(asset.file_path)
     disposition = "inline" if inline else "attachment"
-    name = f"{(asset.label or asset.asset_type).replace(' ', '_')}{Path(asset.file_path).suffix}"
     return FileResponse(
         path, media_type="audio/wav", filename=name,
         content_disposition_type=disposition,
