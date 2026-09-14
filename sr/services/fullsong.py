@@ -13,7 +13,7 @@ any one section can be regenerated on its own afterwards (Stage 9).
 from __future__ import annotations
 
 import numpy as np
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from sr.common import dsp, guide
@@ -48,11 +48,14 @@ _ASSIGN_FIELDS = (
 
 
 def _clear_structure(db: Session, song: Song) -> None:
-    for line in list(song.lyric_lines):
-        db.delete(line)
-    for section in list(song.sections):
-        db.delete(section)
+    # Bulk SQL deletes instead of per-row ORM cascade — a song with many lyric
+    # lines (long lyrics) can otherwise time out deleting one row at a time.
+    # vocal_roles have DB-level ON DELETE CASCADE from both section_id and
+    # lyric_line_id, so this still removes them correctly.
+    db.execute(delete(LyricLine).where(LyricLine.song_id == song.id))
+    db.execute(delete(SongSection).where(SongSection.song_id == song.id))
     db.flush()
+    db.expire(song, ["sections", "lyric_lines"])
 
 
 def _write_guide(

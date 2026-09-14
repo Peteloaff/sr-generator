@@ -114,7 +114,9 @@ export default function Home() {
         lyrics: lyrics.trim() || undefined,
         genre: genreSlug,
       });
-      if (lyrics.trim()) await api.replaceLines(song.id, lyrics);
+      // Note: not calling replaceLines here — generateFullSong reads
+      // song.lyrics directly and rebuilds the section/line structure itself
+      // (wastefully creating and immediately deleting rows otherwise).
 
       if (pickBand) {
         for (const role of PLAYER_ROLES) {
@@ -164,7 +166,6 @@ export default function Home() {
         style_blend: song.style_blend,
         seed: Math.floor(Math.random() * 1_000_000),
       });
-      if (song.lyrics?.trim()) await api.replaceLines(copy.id, song.lyrics);
       const job = await api.generateFullSong(copy.id, {
         prompt: song.prompt ?? undefined,
         genre: song.genre,
