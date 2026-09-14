@@ -4,9 +4,9 @@
     {
       "name": "web",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": ["run", "dev", "--", "--port", "3100"],
       "cwd": "apps/web",
-      "port": 3000
+      "port": 3100
     }
   ]
 }

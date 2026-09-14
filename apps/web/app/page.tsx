@@ -1,57 +1,178 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { api, type Singer, type Song } from "@/lib/api";
+import {
+  api,
+  PLAYER_ROLES,
+  PLAYER_ROLE_LABEL,
+  type Genre,
+  type Player,
+  type PlayerRole,
+  type Singer,
+  type Song,
+} from "@/lib/api";
 import { playSong } from "@/lib/player";
 
-const STYLE_CHIPS = [
-  "driving", "anthemic", "melodic", "heavy", "electronic",
-  "ballad", "aggressive", "atmospheric", "uplifting", "dark",
-];
+const EMPTY_ROLE_PICKS: Record<PlayerRole, string> = {
+  lead_guitar: "", rhythm_guitar: "", bass: "", drums: "", keys: "",
+};
+
+async function waitForJob(jobId: string, rounds = 4) {
+  let job = await api.waitJob(jobId);
+  let n = 1;
+  while (job.status !== "succeeded" && job.status !== "failed" && n < rounds) {
+    job = await api.waitJob(jobId);
+    n++;
+  }
+  return job;
+}
 
 export default function Home() {
-  const router = useRouter();
   const [songs, setSongs] = useState<Song[]>([]);
   const [singers, setSingers] = useState<Singer[]>([]);
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [genres, setGenres] = useState<Genre[]>([]);
   const [err, setErr] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
 
   const [title, setTitle] = useState("");
-  const [styles, setStyles] = useState<string[]>([]);
-  const [prompt, setPrompt] = useState("");
-  const [creating, setCreating] = useState(false);
+  const [styleTags, setStyleTags] = useState<string[]>([]);
+  const [styleInput, setStyleInput] = useState("");
+  const [vibe, setVibe] = useState("");
+  const [lyrics, setLyrics] = useState("");
+  const [pickBand, setPickBand] = useState(false);
+  const [singerId, setSingerId] = useState("");
+  const [rolePicks, setRolePicks] = useState<Record<PlayerRole, string>>(EMPTY_ROLE_PICKS);
 
-  useEffect(() => {
+  const [creating, setCreating] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const refresh = useCallback(() => {
     api.listSongs().then(setSongs).catch((e) => setErr(String(e)));
-    api.listSingers().then(setSingers).catch(() => {});
   }, []);
 
-  const toggleStyle = (s: string) =>
-    setStyles((cur) => (cur.includes(s) ? cur.filter((x) => x !== s) : [...cur, s]));
+  useEffect(() => {
+    refresh();
+    api.listSingers().then(setSingers).catch(() => {});
+    api.listPlayers().then(setPlayers).catch(() => {});
+    api.listGenres().then(setGenres).catch(() => setGenres([]));
+  }, [refresh]);
+
+  const addStyleTag = (raw: string) => {
+    const v = raw.trim();
+    setStyleInput("");
+    if (!v) return;
+    setStyleTags((cur) => (cur.some((t) => t.toLowerCase() === v.toLowerCase()) ? cur : [...cur, v]));
+  };
+  const removeStyleTag = (v: string) => setStyleTags((cur) => cur.filter((t) => t !== v));
+
+  const castSingerOnAllSections = async (songId: string, id: string) => {
+    const sections = await api.listSections(songId);
+    for (const sec of sections) {
+      const role = await api.createSectionRole(sec.id, {
+        role_type: "lead", ensemble_size: 1, width: 0,
+      });
+      await api.addAssignment(role.id, id, 100);
+      await waitForJob((await api.renderSection(songId, sec.id)).id);
+    }
+  };
 
   const create = async () => {
     if (!title.trim() || creating) return;
     setCreating(true);
     setErr(null);
+    setNote(null);
     try {
-      const promptText = [styles.join(", "), prompt.trim()].filter(Boolean).join(". ");
-      const song = await api.createSong(title.trim(), promptText ? { prompt: promptText } : {});
-      router.push(`/song?id=${song.id}`);
+      const genreSlug = styleTags[0]?.trim().toLowerCase().replace(/\s+/g, "_") || null;
+      const styleText = [styleTags.join(", "), vibe.trim()].filter(Boolean).join(". ");
+      const song = await api.createSong(title.trim(), {
+        prompt: styleText || undefined,
+        lyrics: lyrics.trim() || undefined,
+        genre: genreSlug,
+      });
+      if (lyrics.trim()) await api.replaceLines(song.id, lyrics);
+
+      if (pickBand) {
+        for (const role of PLAYER_ROLES) {
+          const pid = rolePicks[role];
+          if (pid) await api.setInstrument(song.id, { role, player_id: pid });
+        }
+      }
+
+      const job = await api.generateFullSong(song.id, {
+        prompt: styleText || undefined,
+        genre: genreSlug,
+      });
+      const done = await waitForJob(job.id);
+
+      if (done.status === "failed") {
+        setErr(done.error || "generation failed");
+      } else {
+        if (pickBand && singerId) {
+          setNote("Casting your singer…");
+          await castSingerOnAllSections(song.id, singerId);
+        }
+        setNote(done.status === "succeeded" ? `"${song.title}" is ready — see it below.` : `"${song.title}" is still rendering — it'll appear below shortly.`);
+      }
+      setTitle("");
+      setStyleTags([]);
+      setVibe("");
+      setLyrics("");
+      setSingerId("");
+      setRolePicks(EMPTY_ROLE_PICKS);
+      refresh();
     } catch (e) {
       setErr(String(e));
+    } finally {
       setCreating(false);
     }
   };
 
+  const remix = async (song: Song) => {
+    setBusyId(song.id);
+    setErr(null);
+    setNote(null);
+    try {
+      const copy = await api.createSong(`${song.title} (remix)`, {
+        prompt: song.prompt ?? undefined,
+        lyrics: song.lyrics ?? undefined,
+        genre: song.genre,
+        style_blend: song.style_blend,
+        seed: Math.floor(Math.random() * 1_000_000),
+      });
+      if (song.lyrics?.trim()) await api.replaceLines(copy.id, song.lyrics);
+      const job = await api.generateFullSong(copy.id, {
+        prompt: song.prompt ?? undefined,
+        genre: song.genre,
+        seed: Math.floor(Math.random() * 1_000_000),
+      });
+      const done = await waitForJob(job.id);
+      if (done.status === "failed") setErr(done.error || "remix failed");
+      else setNote(`"${copy.title}" is ready — see it below.`);
+      refresh();
+    } catch (e) {
+      setErr(String(e));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const remove = async (song: Song) => {
+    if (!confirm(`Delete "${song.title}"? This can't be undone.`)) return;
+    setErr(null);
+    try {
+      await api.deleteSong(song.id);
+      refresh();
+    } catch (e) {
+      setErr(String(e));
+    }
+  };
+
   return (
-    <div>
+    <div className="stack">
       <section className="hero">
         <h1>Make a song with your band.</h1>
-        <p className="lede">
-          Write the words and the vibe, cast your singers and players on every
-          section, then generate a full, editable track — stems and all.
-        </p>
         <div className="row tight" style={{ marginTop: "0.9rem" }}>
           <a
             className="btn primary"
@@ -69,55 +190,153 @@ export default function Home() {
       </section>
 
       <div className="card pad-lg">
-        <h3 style={{ marginTop: 0 }}>Create a song</h3>
+        <h2 style={{ marginTop: 0 }}>Create a song</h2>
         {err && <p className="danger">{err}</p>}
+        {note && <p className="muted">{note}</p>}
         <div className="stack">
           <input
             placeholder="Song title"
             value={title}
             autoFocus
             onChange={(e) => setTitle(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && create()}
             style={{ fontSize: "1.05rem" }}
           />
+
           <div>
             <label style={{ marginBottom: "0.4rem", display: "block" }}>Style</label>
-            <div className="row tight" style={{ gap: "0.4rem" }}>
-              {STYLE_CHIPS.map((s) => (
-                <span
-                  key={s}
-                  className={`chip toggle ${styles.includes(s) ? "on" : ""}`}
-                  onClick={() => toggleStyle(s)}
-                >
-                  {s}
+            <div
+              className="row tight"
+              style={{ flexWrap: "wrap", border: "1px solid var(--line)", borderRadius: 8, padding: "0.4rem" }}
+            >
+              {styleTags.map((t) => (
+                <span key={t} className="chip toggle on">
+                  {t}
+                  <button
+                    type="button"
+                    aria-label={`remove ${t}`}
+                    onClick={() => removeStyleTag(t)}
+                    style={{
+                      marginLeft: "0.4rem", background: "none", border: "none",
+                      color: "inherit", cursor: "pointer", font: "inherit",
+                    }}
+                  >
+                    ×
+                  </button>
                 </span>
               ))}
+              <input
+                list="style-suggestions"
+                placeholder={styleTags.length ? "add another…" : "type a style and press Enter — e.g. metal, ballad, driving"}
+                value={styleInput}
+                onChange={(e) => setStyleInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === ",") {
+                    e.preventDefault();
+                    addStyleTag(styleInput);
+                  } else if (e.key === "Backspace" && !styleInput && styleTags.length) {
+                    removeStyleTag(styleTags[styleTags.length - 1]);
+                  }
+                }}
+                onBlur={() => addStyleTag(styleInput)}
+                style={{ flex: 1, minWidth: 180, border: "none" }}
+              />
+              <datalist id="style-suggestions">
+                {genres.map((g) => (
+                  <option key={g.id} value={g.label} />
+                ))}
+              </datalist>
             </div>
+            <input
+              placeholder="anything else — mood, subject, references… (optional)"
+              value={vibe}
+              onChange={(e) => setVibe(e.target.value)}
+              style={{ marginTop: "0.4rem" }}
+            />
           </div>
-          <textarea
-            rows={2}
-            placeholder="Anything else about the song — mood, subject, references…"
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-          />
+
+          <div>
+            <label style={{ marginBottom: "0.4rem", display: "block" }}>Lyrics</label>
+            <textarea
+              rows={8}
+              placeholder="One line per row. Leave blank and a placeholder scaffold fills in — come back and rewrite it after."
+              value={lyrics}
+              onChange={(e) => setLyrics(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <button
+              type="button"
+              className="ghost sm"
+              onClick={() => setPickBand(!pickBand)}
+              style={{ alignSelf: "flex-start" }}
+            >
+              {pickBand ? "hide" : "+"} pick players / band (optional — leave closed for a generic song)
+            </button>
+            {pickBand && (
+              <div className="card" style={{ marginTop: "0.6rem", background: "var(--surface-2)" }}>
+                <div className="row space tight">
+                  <p className="muted" style={{ margin: 0 }}>
+                    Choose uploaded, created, predefined (signature) or leave as default for each part.
+                  </p>
+                  <Link href="/band" className="btn sm ghost">
+                    build your band →
+                  </Link>
+                </div>
+                <div className="grid" style={{ marginTop: "0.5rem" }}>
+                  <label style={{ display: "block" }}>
+                    <span className="faint" style={{ display: "block", fontSize: "0.8rem" }}>
+                      Vocalist
+                    </span>
+                    <select value={singerId} onChange={(e) => setSingerId(e.target.value)}>
+                      <option value="">— default —</option>
+                      {singers.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {PLAYER_ROLES.map((role) => (
+                    <label key={role} style={{ display: "block" }}>
+                      <span className="faint" style={{ display: "block", fontSize: "0.8rem" }}>
+                        {PLAYER_ROLE_LABEL[role]}
+                      </span>
+                      <select
+                        value={rolePicks[role]}
+                        onChange={(e) => setRolePicks({ ...rolePicks, [role]: e.target.value })}
+                      >
+                        <option value="">— default —</option>
+                        {players
+                          .filter((p) => p.role === role)
+                          .map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name}
+                            </option>
+                          ))}
+                      </select>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="row" style={{ margin: 0 }}>
             <button className="primary big" onClick={create} disabled={!title.trim() || creating}>
-              {creating ? "creating…" : "Create song →"}
+              {creating ? "generating…" : "Generate song →"}
             </button>
-            <span className="faint">You'll add lyrics and singers on the next screen.</span>
           </div>
         </div>
       </div>
 
-      <h2>Your songs</h2>
-      {songs.length === 0 ? (
-        <div className="empty">No songs yet — create one above.</div>
-      ) : (
-        <div className="grid">
-          {songs
-            .slice()
-            .reverse()
-            .map((s) => (
+      <div>
+        <h2>Songs</h2>
+        {songs.length === 0 ? (
+          <div className="empty">No songs yet — create one above.</div>
+        ) : (
+          <div className="grid">
+            {songs.map((s) => (
               <div key={s.id} className="card card-link">
                 <div className="row space tight">
                   <Link href={`/song?id=${s.id}`} style={{ fontWeight: 700 }}>
@@ -126,36 +345,37 @@ export default function Home() {
                   <span className={`pill ${s.status === "ready" ? "ok" : ""}`}>{s.status}</span>
                 </div>
                 <div className="row tight" style={{ margin: "0.3rem 0 0" }}>
-                  {s.status === "ready" && (
-                    <button
-                      className="np-btn"
-                      title="play"
-                      onClick={() => playSong(s, songs.slice().reverse())}
-                    >
-                      ▶ play
-                    </button>
-                  )}
                   <span className="faint" style={{ fontSize: "0.85rem" }}>
                     {s.duration ? `${s.duration.toFixed(0)}s` : "not generated"}
                     {s.key ? ` · ${s.key}` : ""}
                     {s.bpm ? ` · ${Math.round(s.bpm)} bpm` : ""}
                   </span>
                 </div>
+                <div className="row tight" style={{ margin: "0.5rem 0 0" }}>
+                  <button
+                    className="np-btn"
+                    title="play"
+                    disabled={s.status !== "ready"}
+                    onClick={() => playSong(s, songs)}
+                  >
+                    ▶ play
+                  </button>
+                  <button
+                    className="sm ghost"
+                    title="remix"
+                    disabled={busyId === s.id}
+                    onClick={() => remix(s)}
+                  >
+                    {busyId === s.id ? "remixing…" : "⤾ remix"}
+                  </button>
+                  <button className="danger sm" title="delete" onClick={() => remove(s)}>
+                    delete
+                  </button>
+                </div>
               </div>
             ))}
-        </div>
-      )}
-
-      <h2>Your band</h2>
-      <div className="row" style={{ gap: "0.5rem" }}>
-        {singers.map((s) => (
-          <span key={s.id} className={`chip ${s.training_status === "ready" ? "ok" : ""}`}>
-            {s.name}
-          </span>
-        ))}
-        <Link href="/singers" className="btn sm ghost">
-          {singers.length ? "Manage singers & record voices" : "Add singers & record your voice"}
-        </Link>
+          </div>
+        )}
       </div>
     </div>
   );
