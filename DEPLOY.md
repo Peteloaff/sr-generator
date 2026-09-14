@@ -93,6 +93,7 @@ cd sr-generator
 gcloud run deploy sr-generator-api \
   --source . --region "$REGION" --allow-unauthenticated \
   --memory 2Gi --cpu 2 --timeout 900 --concurrency 4 --max-instances 3 \
+  --no-cpu-throttling \
   --set-secrets SR_DATABASE_URL=SR_DATABASE_URL:latest,SR_S3_SECRET_ACCESS_KEY=SR_S3_SECRET_ACCESS_KEY:latest \
   --set-env-vars '^@^SR_STORAGE_BACKEND=s3@SR_S3_ENDPOINT_URL=https://<ref>.supabase.co/storage/v1/s3@SR_S3_REGION=us-east-1@SR_S3_BUCKET=sr-audio@SR_S3_ACCESS_KEY_ID=<supabase s3 access key id>@SR_QUEUE_BACKEND=inline@SR_API_CORS_ORIGINS=*'
 ```
@@ -153,8 +154,13 @@ Custom domain: add it in Vercel, then add it to `SR_API_CORS_ORIGINS` too
   recycle, clearing scratch. If you see OOMs, raise memory or lower concurrency.
 - **Cold starts.** `--max-instances=3`, scale-to-zero. First request after idle
   takes a few seconds. Set `--min-instances=1` to avoid it (costs ~$/month).
-- **Cost driver.** Audio rendering is CPU-bound; you pay vCPU-seconds while a
-  request runs. Keep `--concurrency` low so one slow render doesn't starve others.
+- **Cost driver.** Audio rendering is CPU-bound. `--no-cpu-throttling` (CPU
+  always allocated) is required — the "inline" job queue renders in a
+  background thread, not inside the triggering request, so Cloud Run's
+  default request-only CPU allocation starves/stalls long generations. This
+  means you're billed for vCPU continuously per warm instance, not just
+  during requests; keep `--concurrency` low and `--max-instances` capped to
+  bound that cost.
 - **Voice consent.** The app already gates training/generation on per-singer
   consent flags. A public/commercial deployment should also put voice-likeness
   terms in front of users — get legal review before selling.

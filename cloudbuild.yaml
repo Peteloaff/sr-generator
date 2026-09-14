@@ -45,6 +45,10 @@ steps:
       - "--timeout=900"
       - "--concurrency=4"
       - "--max-instances=3"
+      # CPU must stay allocated between requests: the "inline" job queue runs
+      # generation in a background thread, not inside the triggering request,
+      # so default request-only CPU throttling can stall/starve long renders.
+      - "--no-cpu-throttling"
       # secrets + non-secret env come from the Cloud Run service config / a
       # --set-secrets / --set-env-vars you pass once (see DEPLOY.md); this build
       # only rolls the image.
