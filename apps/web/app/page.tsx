@@ -19,6 +19,17 @@ const EMPTY_ROLE_PICKS: Record<PlayerRole, string> = {
   lead_guitar: "", rhythm_guitar: "", bass: "", drums: "", keys: "",
 };
 
+const DEFAULT_VOICES: Record<string, { label: string; profile: Record<string, number> }> = {
+  male: {
+    label: "Male",
+    profile: { median_f0: 110, formant_semitones: -2, brightness: 0, breathiness: 0.08, roughness: 0.05 },
+  },
+  female: {
+    label: "Female",
+    profile: { median_f0: 220, formant_semitones: 2, brightness: 0.1, breathiness: 0.12, roughness: 0.03 },
+  },
+};
+
 async function waitForJob(jobId: string, rounds = 4) {
   let job = await api.waitJob(jobId);
   let n = 1;
@@ -90,6 +101,28 @@ export default function Home() {
     return null;
   };
 
+  const resolveSinger = async (pick: string): Promise<string | null> => {
+    if (!pick) return null;
+    if (pick.startsWith("default:")) {
+      const key = pick.slice(8);
+      const def = DEFAULT_VOICES[key];
+      if (!def) return null;
+      const existing = singers.find((s) => s.name === def.label);
+      if (existing) return existing.id;
+      try {
+        const created = await api.createSinger(def.label);
+        await api.updateSinger(created.id, { consent_generation: true });
+        await api.setVoiceProfile(created.id, def.profile);
+        setSingers((cur) => [...cur, created]);
+        return created.id;
+      } catch {
+        const found = singers.find((s) => s.name === def.label);
+        return found?.id ?? null;
+      }
+    }
+    return pick;
+  };
+
   const castSingerOnAllSections = async (songId: string, id: string) => {
     const sections = await api.listSections(songId);
     for (const sec of sections) {
@@ -136,7 +169,8 @@ export default function Home() {
       } else {
         if (pickBand && singerId) {
           setNote("Casting your singer…");
-          await castSingerOnAllSections(song.id, singerId);
+          const sid = await resolveSinger(singerId);
+          if (sid) await castSingerOnAllSections(song.id, sid);
         }
         setNote(done.status === "succeeded" ? `"${song.title}" is ready — see it below.` : `"${song.title}" is still rendering — it'll appear below shortly.`);
       }
@@ -313,12 +347,23 @@ export default function Home() {
                       Vocalist
                     </span>
                     <select value={singerId} onChange={(e) => setSingerId(e.target.value)}>
-                      <option value="">— default —</option>
-                      {singers.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name}
-                        </option>
-                      ))}
+                      <option value="">— none —</option>
+                      {singers.length > 0 && (
+                        <optgroup label="Your singers">
+                          {singers.map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.name}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      <optgroup label="Default voices">
+                        {Object.entries(DEFAULT_VOICES).map(([key, v]) => (
+                          <option key={key} value={`default:${key}`}>
+                            {v.label}
+                          </option>
+                        ))}
+                      </optgroup>
                     </select>
                   </label>
                   {PLAYER_ROLES.map((role) => {
