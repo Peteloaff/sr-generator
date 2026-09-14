@@ -36,6 +36,10 @@ class Settings(BaseSettings):
 
     music_provider: str = "local_synth"
     music_http_url: str = ""
+    # Real hosted text-to-music model via Replicate (SR_MUSIC_PROVIDER=replicate).
+    # Token from https://replicate.com/account/api-tokens.
+    replicate_api_token: str = ""
+    replicate_music_model_version: str = "stereo-large"
     voice_provider: str = "local_dsp"
     voice_http_url: str = ""
     stem_provider: str = "center_split"

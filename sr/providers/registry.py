@@ -14,6 +14,7 @@ from sr.providers.multistem_demucs import DemucsStemProvider
 from sr.providers.multistem_local import BandSplitStemProvider
 from sr.providers.music_http import HttpMusicProvider
 from sr.providers.music_local import LocalSynthMusicProvider
+from sr.providers.music_replicate import ReplicateMusicProvider
 from sr.providers.playerstyle_local import LocalDspPlayerStyleProvider
 from sr.providers.stem_http import HttpStemProvider
 from sr.providers.stem_local import CenterSplitStemProvider
@@ -24,6 +25,7 @@ _REGISTRY: dict[tuple[str, str], type[base.BaseProvider]] = {
     ("music", "mock"): mock.MockMusicProvider,
     ("music", "local_synth"): LocalSynthMusicProvider,
     ("music", "http"): HttpMusicProvider,
+    ("music", "replicate"): ReplicateMusicProvider,
     ("voice", "mock"): mock.MockVoiceProvider,
     ("voice", "local_dsp"): LocalDspVoiceProvider,
     ("voice", "http"): HttpVoiceProvider,

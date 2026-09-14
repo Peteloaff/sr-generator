@@ -72,7 +72,24 @@ are untouched — see `sr/providers/voice_http.py` for the wire format.
 |---|---|---|
 | `local_synth` (default) | deterministic NumPy instrumental engine (`sr/common/musicgen.py`) — drums quantised to the BPM, a diatonic progression in the key, bass/pad/arp/drone. Trains band adapters by distilling the Band DNA. Byte-reproducible from a seed. | nothing |
 | `mock` | near-silent stereo noise | nothing (fast tests) |
-| `http` | a real generative-music service | `SR_MUSIC_HTTP_URL`, `httpx` |
+| `replicate` | **real hosted model** — Meta's MusicGen via [Replicate](https://replicate.com), pay-per-second, no GPU to run. `sr/providers/music_replicate.py`. Does not train band adapters (generic prompt-conditioned model). | `SR_REPLICATE_API_TOKEN` (from replicate.com/account/api-tokens) |
+| `http` | any other generative-music service you stand up yourself | `SR_MUSIC_HTTP_URL`, `httpx` |
+
+### Using the hosted MusicGen model (`replicate`)
+
+1. Create an account at [replicate.com](https://replicate.com), add a payment
+   method, then generate a token at replicate.com/account/api-tokens.
+2. Set `SR_MUSIC_PROVIDER=replicate` and `SR_REPLICATE_API_TOKEN=<token>` (as a
+   Secret Manager secret on Cloud Run, or in `.env` locally).
+3. Nothing else changes — same jobs, same section/stem wiring, same caching.
+   It returns one mixed instrumental per section (no per-instrument stems,
+   since MusicGen doesn't separate them — the pipeline already handles
+   providers with no `stems`).
+4. Optional: `SR_REPLICATE_MUSIC_MODEL_VERSION` picks the MusicGen variant
+   (default `stereo-large`; see the model's Replicate page for others).
+
+Cost is per second of Replicate compute time actually spent generating, billed
+by Replicate directly — check their pricing page for current rates.
 
 **`MusicGenerationProvider` contract** — a real model implements:
 
