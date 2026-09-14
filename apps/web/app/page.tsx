@@ -8,6 +8,7 @@ import {
   PLAYER_ROLE_LABEL,
   type Genre,
   type Player,
+  type PlayerPreset,
   type PlayerRole,
   type Singer,
   type Song,
@@ -32,6 +33,7 @@ export default function Home() {
   const [songs, setSongs] = useState<Song[]>([]);
   const [singers, setSingers] = useState<Singer[]>([]);
   const [players, setPlayers] = useState<Player[]>([]);
+  const [presets, setPresets] = useState<PlayerPreset[]>([]);
   const [genres, setGenres] = useState<Genre[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -56,6 +58,7 @@ export default function Home() {
     refresh();
     api.listSingers().then(setSingers).catch(() => {});
     api.listPlayers().then(setPlayers).catch(() => {});
+    api.listPlayerPresets().then(setPresets).catch(() => setPresets([]));
     api.listGenres().then(setGenres).catch(() => setGenres([]));
   }, [refresh]);
 
@@ -66,6 +69,26 @@ export default function Home() {
     setStyleTags((cur) => (cur.some((t) => t.toLowerCase() === v.toLowerCase()) ? cur : [...cur, v]));
   };
   const removeStyleTag = (v: string) => setStyleTags((cur) => cur.filter((t) => t !== v));
+
+  const resolveRolePlayer = async (pick: string): Promise<string | null> => {
+    if (!pick) return null;
+    if (pick.startsWith("p:")) return pick.slice(2);
+    if (pick.startsWith("preset:")) {
+      const presetId = pick.slice(7);
+      const preset = presets.find((pr) => pr.id === presetId);
+      if (!preset) return null;
+      try {
+        const created = await api.createPlayerFromPreset(presetId, preset.label);
+        setPlayers((cur) => [...cur, created]);
+        return created.id;
+      } catch {
+        // name collision, most likely — someone already added this preset under this name
+        const existing = players.find((p) => p.name === preset.label);
+        return existing?.id ?? null;
+      }
+    }
+    return null;
+  };
 
   const castSingerOnAllSections = async (songId: string, id: string) => {
     const sections = await api.listSections(songId);
@@ -95,7 +118,7 @@ export default function Home() {
 
       if (pickBand) {
         for (const role of PLAYER_ROLES) {
-          const pid = rolePicks[role];
+          const pid = await resolveRolePlayer(rolePicks[role]);
           if (pid) await api.setInstrument(song.id, { role, player_id: pid });
         }
       }
@@ -297,26 +320,43 @@ export default function Home() {
                       ))}
                     </select>
                   </label>
-                  {PLAYER_ROLES.map((role) => (
-                    <label key={role} style={{ display: "block" }}>
-                      <span className="faint" style={{ display: "block", fontSize: "0.8rem" }}>
-                        {PLAYER_ROLE_LABEL[role]}
-                      </span>
-                      <select
-                        value={rolePicks[role]}
-                        onChange={(e) => setRolePicks({ ...rolePicks, [role]: e.target.value })}
-                      >
-                        <option value="">— default —</option>
-                        {players
-                          .filter((p) => p.role === role)
-                          .map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.name}
-                            </option>
-                          ))}
-                      </select>
-                    </label>
-                  ))}
+                  {PLAYER_ROLES.map((role) => {
+                    const mine = players.filter((p) => p.role === role);
+                    const defaults = presets.filter(
+                      (pr) => pr.role === role && !mine.some((p) => p.name === pr.label),
+                    );
+                    return (
+                      <label key={role} style={{ display: "block" }}>
+                        <span className="faint" style={{ display: "block", fontSize: "0.8rem" }}>
+                          {PLAYER_ROLE_LABEL[role]}
+                        </span>
+                        <select
+                          value={rolePicks[role]}
+                          onChange={(e) => setRolePicks({ ...rolePicks, [role]: e.target.value })}
+                        >
+                          <option value="">— none —</option>
+                          {mine.length > 0 && (
+                            <optgroup label="Your players">
+                              {mine.map((p) => (
+                                <option key={p.id} value={`p:${p.id}`}>
+                                  {p.name}
+                                </option>
+                              ))}
+                            </optgroup>
+                          )}
+                          {defaults.length > 0 && (
+                            <optgroup label="Default players">
+                              {defaults.map((pr) => (
+                                <option key={pr.id} value={`preset:${pr.id}`}>
+                                  {pr.label}
+                                </option>
+                              ))}
+                            </optgroup>
+                          )}
+                        </select>
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
             )}
