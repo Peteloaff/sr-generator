@@ -146,6 +146,32 @@ def test_generate_raises_on_failed_prediction(monkeypatch):
         )
 
 
+def test_large_derived_seed_is_folded_into_uint32_range(monkeypatch):
+    # this app's derive_seed() produces large hash-based ints; Replicate
+    # rejects anything outside 0..2**32-1 with "Seed must be between 0 and
+    # 2**32 - 1", so out-of-range seeds must be folded down, not passed as-is.
+    huge_seed = 123456789012345678
+
+    def fake_post(self, url, headers=None, json=None):
+        assert json["input"]["seed"] == huge_seed % (2**32)
+        assert 0 <= json["input"]["seed"] < 2**32
+        return _FakeResponse({"id": "s1", "status": "succeeded",
+                               "output": "https://replicate.delivery/out.wav",
+                               "version": "v1"})
+
+    def fake_get(self, url, headers=None):
+        if url.endswith("/models/meta/musicgen"):
+            return _FakeResponse(_MODEL_INFO)
+        return _FakeResponse(content=_wav_bytes())
+
+    monkeypatch.setattr(httpx.Client, "post", fake_post)
+    monkeypatch.setattr(httpx.Client, "get", fake_get)
+
+    ReplicateMusicProvider().generate(
+        prompt="test", params={}, seed=huge_seed, adapter=None,
+    )
+
+
 def test_duration_is_clamped_to_max():
     provider = ReplicateMusicProvider()
     text = provider._prompt_text("x", {"bpm": None, "key": None})

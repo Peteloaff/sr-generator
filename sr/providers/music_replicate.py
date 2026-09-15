@@ -83,6 +83,9 @@ class ReplicateMusicProvider(MusicGenerationProvider):
         duration = min(_MAX_SECONDS, max(1.0, float(params.get("duration") or 8.0)))
         text = self._prompt_text(prompt, params)
         headers = {"Authorization": f"Bearer {self._token()}"}
+        # this app's seeds are derived (large hash-based ints); Replicate
+        # requires a uint32, so fold it into range while staying deterministic.
+        replicate_seed = int(seed) % (2**32)
 
         with httpx.Client(timeout=60) as client:
             version = self._resolve_version(client, headers)
@@ -97,7 +100,7 @@ class ReplicateMusicProvider(MusicGenerationProvider):
                         "model_version": get_settings().replicate_music_model_version,
                         "output_format": "wav",
                         "normalization_strategy": "peak",
-                        "seed": int(seed),
+                        "seed": replicate_seed,
                     },
                 },
             )
