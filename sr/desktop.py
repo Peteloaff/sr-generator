@@ -53,9 +53,22 @@ def _free_port() -> int:
         return int(s.getsockname()[1])
 
 
+def _load_user_env(data: Path) -> None:
+    """Optional user-supplied overrides, e.g. their own Replicate token for real
+    music generation - a plain text file, never baked into the .exe. Create
+    ``<data>/.env`` with lines like ``SR_MUSIC_PROVIDER=replicate`` and
+    ``SR_REPLICATE_API_TOKEN=...`` (see DESKTOP.md)."""
+    env_file = data / ".env"
+    if env_file.exists():
+        from dotenv import load_dotenv
+
+        load_dotenv(env_file)
+
+
 def _configure_env() -> tuple[Path, Path]:
     res = _resource_root()
     data = _data_dir()
+    _load_user_env(data)
     os.environ.setdefault("SR_DATABASE_URL", f"sqlite:///{(data / 'sr.db').as_posix()}")
     os.environ.setdefault("SR_STORAGE_ROOT", str(data / "storage"))
     os.environ.setdefault("SR_STORAGE_BACKEND", "local")

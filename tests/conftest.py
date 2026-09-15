@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import atexit
 import os
+import shutil
 import tempfile
 from collections.abc import Iterator
 from pathlib import Path
@@ -10,6 +12,11 @@ from pathlib import Path
 import pytest
 
 _TMP = Path(tempfile.mkdtemp(prefix="sr-test-"))
+# mkdtemp dirs are never auto-removed, and every pytest invocation makes a new
+# one full of rendered test audio - left unchecked these silently fill the
+# disk over repeated runs. Best-effort cleanup on interpreter exit covers
+# crashes/Ctrl-C too, not just the normal fixture teardown path below.
+atexit.register(lambda: shutil.rmtree(_TMP, ignore_errors=True))
 os.environ["SR_DATABASE_URL"] = f"sqlite:///{(_TMP / 'test.db').as_posix()}"
 os.environ["SR_STORAGE_ROOT"] = _TMP.as_posix()
 os.environ["SR_QUEUE_BACKEND"] = "eager"

@@ -48,6 +48,29 @@ Environment variables, all honoured before defaults are applied:
 | `SR_DATABASE_URL` | `sqlite:///<SR_HOME>/sr.db` | point at Postgres instead |
 | `SR_STORAGE_BACKEND` | `local` | `s3` to use Supabase Storage |
 
+Instead of setting Windows environment variables by hand, drop a plain text
+file at `<SR_HOME>/.env` (default `C:\Users\<you>\.sr-generator\.env`) — it's
+read automatically on startup, before the defaults above are applied.
+
+### Real music generation (optional)
+
+By default the desktop app uses the same free, offline placeholder synth as
+everything else (`local_synth` — deterministic but not real instruments).
+To use a real hosted model instead, put this in your `.env`:
+
+```
+SR_MUSIC_PROVIDER=replicate
+SR_REPLICATE_API_TOKEN=your-own-token-here
+```
+
+Get a token from [replicate.com/account/api-tokens](https://replicate.com/account/api-tokens)
+(free account, pay-per-second billing — set a spending cap in Replicate's
+billing settings). **This is your own token and your own bill** — the
+desktop app never ships or shares anyone else's credentials, so each person
+running the `.exe` needs their own. See
+[MODEL_SETUP.md](MODEL_SETUP.md#using-the-hosted-musicgen-model-replicate)
+for details on the model itself.
+
 ## Building it
 
 On a machine with **Python 3.12** and **Node 18+**:
