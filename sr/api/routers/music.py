@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
@@ -13,6 +13,7 @@ from sr.models.generation_job import GenerationJob
 from sr.models.song import Song, SongSection
 from sr.schemas.adapter import AdapterRead, AdapterTrainRequest, GenerateInstrumentalRequest
 from sr.schemas.job import JobRead
+from sr.services import ratelimit
 from sr.worker.queue import get_queue
 
 router = APIRouter(tags=["music"])
@@ -75,11 +76,13 @@ def generate_instrumental(
     song_id: str,
     section_id: str,
     body: GenerateInstrumentalRequest,
+    request: Request,
     db: Session = Depends(get_db),
 ) -> GenerationJob:
     section = db.get(SongSection, section_id)
     if section is None or section.song_id != song_id:
         raise HTTPException(404, "section not found")
+    ratelimit.enforce_daily_limit(db, request)
     seed = body.seed if body.seed is not None else (section.generation_seed or section.song.seed)
     job = GenerationJob(
         job_type="generate_music", song_id=song_id, section_id=section_id,

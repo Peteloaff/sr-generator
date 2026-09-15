@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     # Token from https://replicate.com/account/api-tokens.
     replicate_api_token: str = ""
     replicate_music_model_version: str = "stereo-large"
+    # Stopgap per-IP daily cap on paid-model generation calls, before real
+    # accounts/login exist. 0 (or less) disables the limit entirely.
+    max_generations_per_ip_per_day: int = 15
     voice_provider: str = "local_dsp"
     voice_http_url: str = ""
     stem_provider: str = "center_split"

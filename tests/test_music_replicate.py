@@ -10,7 +10,10 @@ import pytest
 import soundfile as sf
 
 from sr.config import get_settings
+from sr.providers import music_replicate
 from sr.providers.music_replicate import ReplicateMusicProvider
+
+_MODEL_INFO = {"latest_version": {"id": "671ac645ce5e552cc63a54a2bbff63fcf798043055d2dac5fc9e36a837eedcfb"}}
 
 
 def _wav_bytes(seconds: float = 1.0, sr: int = 32000) -> bytes:
@@ -40,8 +43,10 @@ class _FakeResponse:
 def _token(monkeypatch):
     monkeypatch.setenv("SR_REPLICATE_API_TOKEN", "test-token")
     get_settings.cache_clear()
+    music_replicate._version_cache.clear()
     yield
     get_settings.cache_clear()
+    music_replicate._version_cache.clear()
 
 
 def test_missing_token_raises(monkeypatch):
@@ -57,7 +62,8 @@ def test_generate_polls_until_succeeded_and_decodes_audio(monkeypatch):
 
     def fake_post(self, url, headers=None, json=None):
         calls["post"] += 1
-        assert "models/meta/musicgen/predictions" in url
+        assert url.endswith("/predictions") and "models/" not in url
+        assert json["version"] == _MODEL_INFO["latest_version"]["id"]
         assert json["input"]["duration"] == 8
         assert "120 BPM" in json["input"]["prompt"]
         assert "key of D minor" in json["input"]["prompt"]
@@ -65,6 +71,8 @@ def test_generate_polls_until_succeeded_and_decodes_audio(monkeypatch):
 
     def fake_get(self, url, headers=None):
         calls["get"] += 1
+        if url.endswith("/models/meta/musicgen"):
+            return _FakeResponse(_MODEL_INFO)
         if url.endswith("/predictions/abc123"):
             return _FakeResponse({"id": "abc123", "status": "succeeded",
                                    "output": "https://replicate.delivery/out.wav",
@@ -83,7 +91,7 @@ def test_generate_polls_until_succeeded_and_decodes_audio(monkeypatch):
     )
 
     assert calls["post"] == 1
-    assert calls["get"] == 2  # one poll + one download
+    assert calls["get"] == 3  # version resolve + one poll + one download
     assert result.provider == "replicate"
     assert result.provider_version == "abcd1234"
     assert result.audio.ndim == 2 and result.audio.shape[1] == 2
@@ -99,6 +107,8 @@ def test_generate_polls_multiple_times_before_success(monkeypatch):
         return _FakeResponse({"id": "xyz", "status": "starting"})
 
     def fake_get(self, url, headers=None):
+        if url.endswith("/models/meta/musicgen"):
+            return _FakeResponse(_MODEL_INFO)
         if url.endswith("/predictions/xyz"):
             status = next(statuses, "succeeded")
             body = {"id": "xyz", "status": status}
@@ -123,6 +133,8 @@ def test_generate_raises_on_failed_prediction(monkeypatch):
         return _FakeResponse({"id": "bad", "status": "starting"})
 
     def fake_get(self, url, headers=None):
+        if url.endswith("/models/meta/musicgen"):
+            return _FakeResponse(_MODEL_INFO)
         return _FakeResponse({"id": "bad", "status": "failed", "error": "nope"})
 
     monkeypatch.setattr(httpx.Client, "post", fake_post)

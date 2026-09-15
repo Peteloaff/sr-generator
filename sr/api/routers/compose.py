@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
@@ -12,7 +12,7 @@ from sr.models.generation_job import GenerationJob
 from sr.models.song import Song
 from sr.schemas.compose import FullSongRequest
 from sr.schemas.job import JobRead
-from sr.services import songplan
+from sr.services import ratelimit, songplan
 from sr.services.dna import band_dna
 from sr.worker.queue import get_queue
 
@@ -47,9 +47,10 @@ def preview_plan(
 
 @router.post("/{song_id}/generate", response_model=JobRead, status_code=201)
 def generate_full_song(
-    song_id: str, body: FullSongRequest, db: Session = Depends(get_db)
+    song_id: str, body: FullSongRequest, request: Request, db: Session = Depends(get_db)
 ) -> GenerationJob:
     song = _song(db, song_id)
+    ratelimit.enforce_daily_limit(db, request)
     seed = body.seed if body.seed is not None else (song.seed or 0)
     job = GenerationJob(
         job_type="generate_song", song_id=song_id, seed=seed,

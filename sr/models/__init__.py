@@ -7,6 +7,7 @@ from sr.models.band_reference import BandReference
 from sr.models.base import Base
 from sr.models.generation_job import GenerationJob
 from sr.models.instrument_slot import InstrumentSlot
+from sr.models.ip_usage import IpUsage
 from sr.models.player import Player
 from sr.models.project import Project
 from sr.models.render_cache import RenderCache
@@ -25,6 +26,7 @@ __all__ = [
     "Project",
     "Player",
     "InstrumentSlot",
+    "IpUsage",
     "Singer",
     "Song",
     "SongSection",

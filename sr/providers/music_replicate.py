@@ -28,6 +28,12 @@ _POLL_INTERVAL = 2.0
 _POLL_TIMEOUT = 300.0
 _TERMINAL = ("succeeded", "failed", "canceled")
 
+# meta/musicgen is a community (not "official") Replicate model, so the
+# owner/name prediction shorthand 404s - it needs the classic /predictions
+# endpoint with an explicit version hash. Resolved once per process and
+# cached; a redeploy/restart re-resolves it if the model updates.
+_version_cache: dict[str, str] = {}
+
 
 class ReplicateMusicProvider(MusicGenerationProvider):
     name = "replicate"
@@ -56,6 +62,18 @@ class ReplicateMusicProvider(MusicGenerationProvider):
         )
         return f"{prompt}, {extra}" if extra else prompt
 
+    def _resolve_version(self, client: Any, headers: dict[str, str]) -> str:
+        cached = _version_cache.get(_MODEL)
+        if cached:
+            return cached
+        r = client.get(f"{_API}/models/{_MODEL}", headers=headers)
+        r.raise_for_status()
+        version = (r.json().get("latest_version") or {}).get("id")
+        if not version:
+            raise RuntimeError(f"replicate model {_MODEL} has no latest_version")
+        _version_cache[_MODEL] = version
+        return version
+
     def generate(
         self, *, prompt: str, params: dict[str, Any], seed: int, adapter: dict[str, Any] | None
     ) -> MusicGeneration:
@@ -67,10 +85,12 @@ class ReplicateMusicProvider(MusicGenerationProvider):
         headers = {"Authorization": f"Bearer {self._token()}"}
 
         with httpx.Client(timeout=60) as client:
+            version = self._resolve_version(client, headers)
             r = client.post(
-                f"{_API}/models/{_MODEL}/predictions",
+                f"{_API}/predictions",
                 headers=headers,
                 json={
+                    "version": version,
                     "input": {
                         "prompt": text,
                         "duration": int(round(duration)),
@@ -78,7 +98,7 @@ class ReplicateMusicProvider(MusicGenerationProvider):
                         "output_format": "wav",
                         "normalization_strategy": "peak",
                         "seed": int(seed),
-                    }
+                    },
                 },
             )
             r.raise_for_status()

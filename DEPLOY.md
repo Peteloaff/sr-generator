@@ -120,6 +120,20 @@ curl "$URL/health"
 Later redeploys: `git pull && gcloud run deploy sr-generator-api --source . --region "$REGION"`
 (env/secrets stick). `cloudbuild.yaml` is there if you want deploy-on-push CI.
 
+**Real music generation (optional, replaces the placeholder synth):**
+
+```bash
+gcloud secrets create SR_REPLICATE_API_TOKEN --data-file=- <<< "YOUR_TOKEN"
+gcloud secrets add-iam-policy-binding SR_REPLICATE_API_TOKEN \
+  --member="serviceAccount:${PN}-compute@developer.gserviceaccount.com" \
+  --role="roles/secretmanager.secretAccessor"
+gcloud run services update sr-generator-api --region "$REGION" \
+  --set-secrets SR_REPLICATE_API_TOKEN=SR_REPLICATE_API_TOKEN:latest \
+  --set-env-vars SR_MUSIC_PROVIDER=replicate
+```
+
+Needs a Replicate account + API token — see [MODEL_SETUP.md](MODEL_SETUP.md#using-the-hosted-musicgen-model-replicate).
+
 ---
 
 ## 3. Web app → Vercel
